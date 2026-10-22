@@ -1,0 +1,341 @@
+// This is your Prisma schema file.
+// It is the "blueprint" for your database.
+// Every time you change this file, you must run:
+//   npx prisma db push    (to apply changes to your database)
+//   npx prisma generate   (to update the TypeScript types)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// USER MODEL
+// Stores registered user credentials and profile
+// ─────────────────────────────────────────────
+model User {
+  id              String         @id @default(cuid())
+  name            String
+  email           String         @unique
+  emailVerified   Boolean        @default(false)
+  phone           String?
+  countryCode     String         @default("US")     // 2-letter ISO code (e.g. US, GB, CA, NG)
+  passwordHash    String
+  role            Role           @default(USER)     // USER, ADMIN, MODERATOR
+  referralCode    String         @unique            // e.g. "EARN890"
+  referredById    String?
+  accountStatus   UserStatus     @default(ACTIVE)
+  riskScore       Int            @default(0)        // 0=Low, 31-60=Medium, 61+=High risk
+  tickets         Int            @default(0)        // Persistent reward tickets for prize raffles
+  currentStreak   Int            @default(0)        // Consecutive days claimed
+  longestStreak   Int            @default(0)        // Highest consecutive days achieved
+  lastStreakClaimedAt DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relations
+  wallet          Wallet?
+  referredBy      User?          @relation("Referrals", fields: [referredById], references: [id])
+  referrals       User[]         @relation("Referrals")
+  redemptions     RedemptionRequest[]
+  questsCompleted      UserQuest[]
+  auditLogs            AuditLog[]
+  verificationTokens   EmailVerificationToken[]
+  passwordResetTokens  PasswordResetToken[]
+
+  @@index([email])
+  @@index([referralCode])
+  @@index([countryCode])
+}
+
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  PENDING_VERIFICATION
+}
+
+// ─────────────────────────────────────────────
+// WALLET MODEL
+// Accounting standard:
+// 1,000 Coins = $1.00 USD (1 Coin = $0.001 USD)
+// All balance values are integers to prevent rounding errors.
+// ─────────────────────────────────────────────
+model Wallet {
+  id                  String              @id @default(cuid())
+  userId              String              @unique
+  availableCoins      Int                 @default(0)   // Coins ready to be withdrawn
+  pendingCoins        Int                 @default(0)   // Under review by provider
+  reservedCoins       Int                 @default(0)   // Locked in pending redemptions
+  lifetimeEarnedCoins Int                 @default(0)   // Cumulative total earned
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  // Relations
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions        WalletTransaction[]
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────
+// WALLET TRANSACTION MODEL (LEDGER)
+// Every coin movement MUST create a ledger row.
+// ─────────────────────────────────────────────
+model WalletTransaction {
+  id                  String             @id @default(cuid())
+  walletId            String
+  type                TransactionType
+  coins               Int                               // Always positive integer
+  status              TransactionStatus  @default(PENDING)
+  description         String
+  provider            String?                           // e.g. "bitlabs", "cpxresearch", "mock_provider"
+  externalTxId        String?                           // Unique transaction ID from provider
+  referenceId         String?            @unique        // Our internal unique tracking reference
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  // Relations
+  wallet              Wallet             @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId])
+  @@index([externalTxId])
+  @@index([status])
+}
+
+enum TransactionType {
+  OFFER_REWARD         // User completed an offerwall task
+  SURVEY_REWARD        // User completed a survey
+  REFERRAL_REWARD      // Referral commission
+  WITHDRAWAL_RESERVE   // Coins reserved when withdrawal is requested
+  WITHDRAWAL_PAID      // Withdrawal successfully fulfilled
+  WITHDRAWAL_REFUND    // Withdrawal failed and coins returned to available
+  REVERSAL             // Chargeback or reversal from offerwall
+  ADMIN_CREDIT         // Manual support credit
+  ADMIN_DEBIT          // Manual correction debit
+}
+
+enum TransactionStatus {
+  PENDING              // Awaiting confirmation/review
+  APPROVED             // Confirmed and credited
+  REJECTED             // Provider rejected submission
+  REVERSED             // Was approved, subsequently revoked
+  PAID                 // Payout sent to user
+}
+
+// ─────────────────────────────────────────────
+// REDEMPTION REQUEST MODEL
+// Handles payouts and gift card orders
+// ─────────────────────────────────────────────
+model RedemptionRequest {
+  id                  String            @id @default(cuid())
+  userId              String
+  productId           String?                           // References GiftCardProduct if applicable
+  coinsSpent          Int                               // Number of coins deducted
+  displayCurrency     String            @default("USD") // Currency of the reward (e.g. USD, EUR, GBP, NGN)
+  rewardValue         Decimal                           // Face value of the reward (e.g. 5.00)
+  payoutMethod        PayoutMethod                      // GIFT_CARD, CRYPTO, BANK_TRANSFER
+  payoutAddress       String                            // User email, crypto wallet address, or bank details
+  status              RedemptionStatus  @default(PENDING)
+  adminNotes          String?
+  providerTxId        String?                           // Tremendous order ID, Reloadly tx ID, etc.
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  // Relations
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product             GiftCardProduct?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum PayoutMethod {
+  GIFT_CARD
+  CRYPTO
+  BANK_TRANSFER
+}
+
+enum RedemptionStatus {
+  PENDING          // Awaiting automatic processing or fraud clearance
+  PROCESSING       // Sent to payout gateway (e.g. Tremendous/Reloadly)
+  COMPLETED        // Gift card code issued or payout confirmed
+  REJECTED         // Denied due to fraud or compliance
+  REFUNDED         // Coins refunded back to user available balance
+}
+
+// ─────────────────────────────────────────────
+// GIFT CARD CATALOGUE MODEL
+// ─────────────────────────────────────────────
+model GiftCardProduct {
+  id                  String             @id @default(cuid())
+  title               String                            // e.g. "Amazon Gift Card"
+  brand               String                            // e.g. "Amazon"
+  description         String?
+  countryCode         String             @default("GLOBAL") // "US", "GB", "GLOBAL", etc.
+  currency            String             @default("USD")
+  faceValue           Decimal                           // e.g. 5.00
+  coinsCost           Int                               // e.g. 5000 Coins
+  imageUrl            String?
+  isActive            Boolean            @default(true)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  // Relations
+  redemptions         RedemptionRequest[]
+
+  @@index([countryCode])
+  @@index([isActive])
+}
+
+// ─────────────────────────────────────────────
+// AUDIT LOG MODEL
+// Security & Admin action tracking
+// ─────────────────────────────────────────────
+model AuditLog {
+  id                  String            @id @default(cuid())
+  userId              String?
+  action              String                            // e.g. "USER_BANNED", "WITHDRAWAL_APPROVED"
+  ipAddress           String?
+  details             String?                           // JSON string with before/after state
+  createdAt           DateTime          @default(now())
+
+  // Relations
+  user                User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+}
+
+// ─────────────────────────────────────────────
+// OFFER MARKETPLACE MODEL
+// ─────────────────────────────────────────────
+model Offer {
+  id              String         @id @default(cuid())
+  provider        String                            // "bitlabs", "cpxresearch", "mock_provider"
+  externalOfferId String?                           // Provider's own offer ID
+  title           String
+  description     String
+  category        OfferCategory  @default(GAME)
+  difficulty      String         @default("Easy")   // "Easy", "Medium", "Hard"
+  rewardCoins     Int                               // e.g. 1500 Coins ($1.50)
+  timeEstimate    String         @default("~10 mins")
+  device          String         @default("ALL")    // "ANDROID", "IOS", "DESKTOP", "ALL"
+  countryCode     String         @default("GLOBAL") // "US", "GLOBAL", etc.
+  iconUrl         String?
+  instructions    String?                           // Step-by-step completion requirements
+  externalUrl     String?                           // Tracking link to provider offer
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([category])
+  @@index([countryCode])
+  @@index([isActive])
+}
+
+enum OfferCategory {
+  GAME
+  SURVEY
+  APP
+  VIDEO
+  SIGNUP
+}
+
+// ─────────────────────────────────────────────
+// QUEST & STREAK MODELS
+// Gamification, retention, and raffle tickets
+// ─────────────────────────────────────────────
+model Quest {
+  id              String            @id @default(cuid())
+  slug            String            @unique
+  title           String
+  description     String
+  category        QuestCategory     @default(SOCIAL)
+  rewardType      QuestRewardType   @default(TICKETS)
+  rewardAmount    Int                                // e.g. 40 Tickets, or 100 Coins
+  rewardDisplay   String                             // e.g. "40 Tickets", "$0.10 Cash"
+  actionLabel     String                             // e.g. "Follow @FreeRewards"
+  actionUrl       String?
+  iconName        String            @default("social")
+  isRecurring     Boolean           @default(false)  // true for daily streak check-in
+  cooldownHours   Int               @default(0)      // 24 for daily recurring tasks
+  sortOrder       Int               @default(0)
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  completions     UserQuest[]
+
+  @@index([category])
+  @@index([isActive])
+}
+
+enum QuestCategory {
+  DAILY
+  SOCIAL
+  ENGAGEMENT
+  SYSTEM
+}
+
+enum QuestRewardType {
+  TICKETS
+  COINS
+  CASH
+}
+
+model UserQuest {
+  id              String            @id @default(cuid())
+  userId          String
+  questId         String
+  claimedAt       DateTime          @default(now())
+  rewardGranted   Int
+  rewardType      QuestRewardType
+
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quest           Quest             @relation(fields: [questId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([questId])
+  @@index([claimedAt])
+}
+
+// ─────────────────────────────────────────────
+// AUTHENTICATION & SECURITY TOKENS
+// ─────────────────────────────────────────────
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
