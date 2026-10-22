@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 // Eye icons for show/hide password
 function EyeIcon() {
@@ -272,9 +273,16 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={isLoading || passwordMismatch}
-            className="mt-2 w-full py-3.5 rounded-xl bg-indigo-500 text-white font-bold hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-lg shadow-indigo-500/25"
+            className="mt-2 w-full py-3.5 rounded-xl bg-indigo-500 text-white font-bold hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2"
           >
-            {isLoading ? "Creating Account..." : "Create Account"}
+            {isLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Creating Account...</span>
+              </>
+            ) : (
+              "Create Account"
+            )}
           </button>
         </form>
 

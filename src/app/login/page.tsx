@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 
 function EyeIcon() {
   return (
@@ -143,9 +144,16 @@ function LoginContent() {
         <button
           type="submit"
           disabled={isLoading}
-          className="mt-2 w-full py-3.5 rounded-xl bg-indigo-500 text-white font-bold hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-lg shadow-indigo-500/25"
+          className="mt-2 w-full py-3.5 rounded-xl bg-indigo-500 text-white font-bold hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2"
         >
-          {isLoading ? "Signing in..." : "Sign In"}
+          {isLoading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Signing In...</span>
+            </>
+          ) : (
+            "Sign In"
+          )}
         </button>
       </form>
 

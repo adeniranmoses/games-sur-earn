@@ -18,7 +18,8 @@ import {
   Coins,
   Edit2,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Loader2
 } from "lucide-react";
 import { UserProfileData } from "@/types/gpt";
 import { signOut } from "next-auth/react";
@@ -33,6 +34,7 @@ export default function ProfileDrawer({ isOpen, onClose, user }: ProfileDrawerPr
   const [copiedId, setCopiedId] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
   const [promoOffers, setPromoOffers] = useState(true);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [language, setLanguage] = useState("English (US)");
   const [resendStatus, setResendStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [resendLink, setResendLink] = useState<string | null>(null);
@@ -323,11 +325,24 @@ export default function ProfileDrawer({ isOpen, onClose, user }: ProfileDrawerPr
           )}
 
           <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold text-xs transition-colors"
+            onClick={async () => {
+              setIsSigningOut(true);
+              await signOut({ callbackUrl: "/login" });
+            }}
+            disabled={isSigningOut}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold text-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <LogOut className="w-4 h-4" />
-            Sign Out of FreeRewards
+            {isSigningOut ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-red-400" />
+                <span>Signing Out...</span>
+              </>
+            ) : (
+              <>
+                <LogOut className="w-4 h-4" />
+                <span>Sign Out of FreeRewards</span>
+              </>
+            )}
           </button>
         </div>
 

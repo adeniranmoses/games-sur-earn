@@ -15,6 +15,10 @@ export const metadata: Metadata = {
   title: "RewardPlatform – Earn Rewards by Completing Offers",
   description:
     "Earn rewards by completing app installs, surveys, games and sponsored tasks. Withdraw to your bank account.",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
