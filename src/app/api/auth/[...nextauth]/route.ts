@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { NextAuthOptions } from "next-auth";
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET || "9dfbafdbf65854281304a5f17f9b03adcb9242c926a69054d4a98fa0103be212",
   session: {
     strategy: "jwt",
   },
@@ -24,9 +25,11 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Missing email or password");
         }
 
+        const normalizedEmail = credentials.email.toLowerCase().trim();
+
         // Find the user in our database
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email: normalizedEmail },
         });
 
         if (!user) {

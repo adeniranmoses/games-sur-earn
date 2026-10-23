@@ -51,9 +51,11 @@ function LoginContent() {
     setError("");
     setSuccessMessage("");
 
+    const cleanEmail = email.trim();
+
     const res = await signIn("credentials", {
       redirect: false,
-      email,
+      email: cleanEmail,
       password,
     });
 
