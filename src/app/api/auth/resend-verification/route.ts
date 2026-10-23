@@ -58,14 +58,16 @@ export async function POST(req: NextRequest) {
     });
 
     // Send email (or log preview if in dev mode)
-    await sendVerificationEmail(user.email, user.name, token);
+    const emailSent = await sendVerificationEmail(user.email, user.name, token);
 
     const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
     const devVerifyUrl = `${baseUrl}/verify-email?token=${token}`;
 
+    const provideUrlFallback = !emailSent || !process.env.RESEND_API_KEY || process.env.NODE_ENV !== "production";
+
     return NextResponse.json({
       message: "If your email is registered and unverified, a new verification link has been sent.",
-      ...(!process.env.RESEND_API_KEY ? { devVerifyUrl } : {}),
+      ...(provideUrlFallback ? { devVerifyUrl } : {}),
     });
   } catch (error: any) {
     console.error("Resend verification error:", error);

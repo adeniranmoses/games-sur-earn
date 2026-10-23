@@ -119,13 +119,18 @@ export async function POST(req: NextRequest) {
       return { user: newUser, tokenRecord: tokenRec };
     });
 
-    // Send transactional verification email (async, won't block registration if dev mode)
-    await sendVerificationEmail(user.email, user.name, verificationToken).catch((err) => {
+    // Send transactional verification email
+    let emailSent = false;
+    try {
+      emailSent = await sendVerificationEmail(user.email, user.name, verificationToken);
+    } catch (err) {
       console.error("Failed to send verification email:", err);
-    });
+    }
 
     const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
     const devVerifyUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
+
+    const provideUrlFallback = !emailSent || !process.env.RESEND_API_KEY || process.env.NODE_ENV !== "production";
 
     return NextResponse.json(
       {
@@ -133,8 +138,7 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         email: user.email,
         requiresVerification: true,
-        // Expose verifyUrl only when no Resend key is configured
-        ...(!process.env.RESEND_API_KEY ? { devVerifyUrl } : {}),
+        ...(provideUrlFallback ? { devVerifyUrl } : {}),
       },
       { status: 201 }
     );

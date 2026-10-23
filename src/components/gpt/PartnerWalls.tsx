@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Star, Zap, Lock, ExternalLink, ShieldCheck, X, Loader2 } from "lucide-react";
 import { PartnerCardData } from "@/types/gpt";
 
@@ -83,7 +83,7 @@ function BitLabsWallModal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   // Fetch the signed URL from our server (keeps App Token secret)
-  useState(() => {
+  useEffect(() => {
     fetch("/api/offerwall/bitlabs-url")
       .then((r) => r.json())
       .then((data) => {
@@ -95,7 +95,7 @@ function BitLabsWallModal({ onClose }: { onClose: () => void }) {
       })
       .catch(() => setError("Connection error. Please try again."))
       .finally(() => setIsLoading(false));
-  });
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">

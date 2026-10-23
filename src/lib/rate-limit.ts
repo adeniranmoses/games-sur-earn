@@ -41,8 +41,8 @@ export function rateLimit(
   limit: number = 10,
   windowMs: number = 60 * 1000
 ): RateLimitResult {
-  // Generous limit in non-production to prevent developer lockouts during manual testing
-  const effectiveLimit = process.env.NODE_ENV !== "production" ? Math.max(limit, 100) : limit;
+  // Generous limit only in development to prevent developer lockouts during manual testing
+  const effectiveLimit = process.env.NODE_ENV === "development" ? Math.max(limit, 100) : limit;
 
   const now = Date.now();
   const windowStart = now - windowMs;

@@ -84,12 +84,17 @@ export async function POST(req: NextRequest) {
     }).catch((err) => console.error("Audit log error:", err));
 
     // Send transactional email with the 6-digit code
-    await sendPasswordResetOtp(user.email, user.name, otpCode);
+    const emailSent = await sendPasswordResetOtp(user.email, user.name, otpCode);
+
+    // If email failed to dispatch (e.g. Resend sandbox restriction) or in dev/staging,
+    // return devOtp so user/admin is never locked out of testing.
+    const provideOtpFallback = !emailSent || !process.env.RESEND_API_KEY || process.env.NODE_ENV !== "production";
 
     return NextResponse.json({
-      message: "A 6-digit verification code has been dispatched to your email.",
-      // Only return devOtp fallback if no Resend API key is provided
-      ...(!process.env.RESEND_API_KEY ? { devOtp: otpCode } : {}),
+      message: emailSent
+        ? "A 6-digit verification code has been dispatched to your email."
+        : "A 6-digit code has been generated. Use the sandbox code shown below to verify.",
+      ...(provideOtpFallback ? { devOtp: otpCode } : {}),
     });
   } catch (error: any) {
     console.error("Forgot password error:", error);

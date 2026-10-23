@@ -18,7 +18,10 @@ if (!process.env.DATABASE_URL) {
 }
 
 const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const connectionUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
+const prisma = new PrismaClient(
+  connectionUrl ? { datasources: { db: { url: connectionUrl } } } : undefined
+);
 
 async function main() {
   const targetEmail = process.argv[2];
