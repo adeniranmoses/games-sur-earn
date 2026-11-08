@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
     // If email failed to dispatch (e.g. Resend sandbox restriction) or in dev/staging,
     // return devOtp so user/admin is never locked out of testing.
-    const provideOtpFallback = !emailSent || !process.env.RESEND_API_KEY || process.env.NODE_ENV !== "production";
+    const provideOtpFallback = process.env.NODE_ENV !== "production";
 
     return NextResponse.json({
       message: emailSent

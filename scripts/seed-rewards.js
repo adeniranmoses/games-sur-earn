@@ -1,3 +1,22 @@
+const fs = require('fs');
+const path = require('path');
+
+// Auto-load .env
+if (!process.env.DATABASE_URL) {
+  const envPath = path.resolve(__dirname, '..', '.env');
+  if (fs.existsSync(envPath)) {
+    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+    for (const line of lines) {
+      const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+      if (match) {
+        let val = (match[2] || '').trim();
+        if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+        if (!process.env[match[1]]) process.env[match[1]] = val;
+      }
+    }
+  }
+}
+
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();

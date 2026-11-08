@@ -8,7 +8,7 @@
  */
 
 import crypto from "crypto";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "./prisma";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BITLABS — HMAC-SHA1 Signature Validation
@@ -143,7 +143,50 @@ export async function creditUser(params: CreditParams): Promise<CreditResult> {
       },
     });
 
+    // 5. Pay 10% referral commission to active referrer (if any)
+    const user = await tx.user.findUnique({
+      where: { id: userId },
+      select: {
+        referredBy: {
+          select: {
+            id: true,
+            accountStatus: true,
+            wallet: true,
+          },
+        },
+      },
+    });
+
+    if (user?.referredBy && user.referredBy.accountStatus === "ACTIVE" && user.referredBy.wallet) {
+      const referrerWallet = user.referredBy.wallet;
+      const commissionCoins = Math.floor(coins * 0.1); // 10% commission
+      if (commissionCoins > 0) {
+        await tx.wallet.update({
+          where: { id: referrerWallet.id },
+          data: {
+            availableCoins: { increment: commissionCoins },
+            lifetimeEarnedCoins: { increment: commissionCoins },
+          },
+        });
+
+        await tx.walletTransaction.create({
+          data: {
+            walletId: referrerWallet.id,
+            type: "REFERRAL_REWARD",
+            coins: commissionCoins,
+            status: "APPROVED",
+            description: `10% referral commission from offer completion`,
+            provider,
+            referenceId: `REF-${provider.toUpperCase()}-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+          },
+        });
+      }
+    }
+
     return { alreadyProcessed: false as const, newBalance: updated.availableCoins };
+  }, {
+    maxWait: 15000,
+    timeout: 30000,
   });
 
   return result;
@@ -180,13 +223,14 @@ export async function reversalUser(params: ReversalParams): Promise<CreditResult
     if (!wallet) throw new Error(`Wallet not found for userId=${userId}`);
 
     // Deduct — cap at 0 to avoid negative balances
-    const deduct = Math.min(coins, wallet.availableCoins);
+    const deductAvailable = Math.min(coins, wallet.availableCoins);
+    const deductLifetime = Math.min(coins, wallet.lifetimeEarnedCoins);
 
     await tx.walletTransaction.create({
       data: {
         walletId: wallet.id,
         type: "REVERSAL",
-        coins: deduct,
+        coins: deductAvailable,
         status: "REVERSED",
         description,
         provider,
@@ -197,10 +241,16 @@ export async function reversalUser(params: ReversalParams): Promise<CreditResult
 
     const updated = await tx.wallet.update({
       where: { id: wallet.id },
-      data: { availableCoins: { decrement: deduct } },
+      data: {
+        availableCoins: { decrement: deductAvailable },
+        lifetimeEarnedCoins: { decrement: deductLifetime },
+      },
     });
 
     return { alreadyProcessed: false as const, newBalance: updated.availableCoins };
+  }, {
+    maxWait: 15000,
+    timeout: 30000,
   });
 
   return result;

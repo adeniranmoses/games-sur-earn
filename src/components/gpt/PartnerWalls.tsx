@@ -123,21 +123,21 @@ function BitLabsWallModal({ onClose }: { onClose: () => void }) {
         {/* iframe / Loading / Error states */}
         <div className="flex-1 relative">
           {isLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-950">
-              <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
-              <p className="text-sm text-zinc-400">Loading surveys...</p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#F5F7FA]">
+              <Loader2 className="w-8 h-8 text-[#1769D2] animate-spin" />
+              <p className="text-sm text-[#64748B]">Loading surveys...</p>
             </div>
           )}
 
           {error && !isLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950 p-8 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-2xl">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#F5F7FA] p-8 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-xl">
                 ⚠️
               </div>
-              <p className="text-sm text-red-300 font-medium">{error}</p>
+              <p className="text-sm text-rose-700 font-medium">{error}</p>
               <button
                 onClick={() => window.location.reload()}
-                className="px-4 py-2 rounded-full text-xs font-bold bg-white/10 hover:bg-white/20 text-white transition-colors"
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-[#1769D2] hover:bg-[#1558b0] text-white transition-colors cursor-pointer"
               >
                 Retry
               </button>
@@ -160,9 +160,101 @@ function BitLabsWallModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Footer note */}
-        <div className="px-5 py-2.5 border-t border-white/5 shrink-0 flex items-center justify-between text-[11px] text-zinc-500">
+        <div className="px-5 py-2.5 border-t border-[#E2E8F0] shrink-0 flex items-center justify-between text-[11px] text-[#64748B]">
           <span>Surveys powered by BitLabs · Coins credited automatically on completion</span>
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── CPX Research iframe modal ───────────────────────────────────────────────
+function CpxWallModal({ onClose }: { onClose: () => void }) {
+  const [iframeUrl, setIframeUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/offerwall/cpx-url")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.url) {
+          setIframeUrl(data.url);
+        } else {
+          setError("Failed to generate CPX Research survey wall. Please try again.");
+        }
+      })
+      .catch(() => setError("Network error loading CPX Research. Please check your connection."))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+      <div className="relative w-full max-w-3xl h-[80vh] rounded-3xl overflow-hidden border border-white/15 shadow-2xl flex flex-col bg-zinc-950">
+        {/* Header bar */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500/30 to-orange-500/30 border border-amber-500/30 flex items-center justify-center font-black text-amber-300 text-sm">
+              CP
+            </div>
+            <div>
+              <p className="text-sm font-extrabold text-white">CPX Research Survey Router</p>
+              <p className="text-[11px] text-zinc-400">High-yield global surveys · Fast crediting</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
+            aria-label="Close CPX survey wall"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* iframe / Loading / Error states */}
+        <div className="flex-1 relative">
+          {isLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#F5F7FA]">
+              <Loader2 className="w-8 h-8 text-[#1769D2] animate-spin" />
+              <p className="text-sm text-[#64748B]">Connecting to CPX Research surveys...</p>
+            </div>
+          )}
+
+          {error && !isLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#F5F7FA] p-8 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-xl">
+                ⚠️
+              </div>
+              <p className="text-sm text-rose-700 font-medium">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-[#1769D2] hover:bg-[#1558b0] text-white transition-colors cursor-pointer"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {iframeUrl && !error && (
+            <iframe
+              src={iframeUrl}
+              className="w-full h-full border-0"
+              title="CPX Research Survey Wall"
+              allow="camera; microphone"
+              onLoad={() => setIsLoading(false)}
+              onError={() => {
+                setIsLoading(false);
+                setError("Failed to load CPX survey router. Your browser may be blocking iframe popups.");
+              }}
+            />
+          )}
+        </div>
+
+        {/* Footer note */}
+        <div className="px-5 py-2.5 border-t border-[#E2E8F0] shrink-0 flex items-center justify-between text-[11px] text-[#64748B]">
+          <span>Surveys powered by CPX Research · Credits verified via secure S2S callbacks</span>
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
         </div>
       </div>
     </div>
@@ -178,40 +270,40 @@ function PlaceholderWallModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="relative w-full max-w-md p-6 rounded-3xl bg-zinc-900 border border-white/15 shadow-2xl flex flex-col gap-4 text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+      <div className="relative w-full max-w-md p-5 rounded-2xl bg-white border border-[#E2E8F0] shadow-xl flex flex-col gap-3 text-[#102A43]">
         <div className="flex items-start justify-between">
           <div>
-            <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-[#EAF3FF] text-[#1769D2]">
               {partner.type} WALL
             </span>
-            <h3 className="text-xl font-bold mt-1">{partner.name}</h3>
-            <p className="text-xs text-zinc-400 mt-0.5">
+            <h3 className="text-lg font-bold mt-1 text-[#102A43]">{partner.name}</h3>
+            <p className="text-xs text-[#64748B] mt-0.5">
               Rating: {partner.rating}/5.0 · {partner.category}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
+            className="w-7 h-7 rounded-lg hover:bg-gray-100 text-[#64748B] hover:text-[#102A43] transition-colors flex items-center justify-center cursor-pointer text-sm font-bold"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-xs text-zinc-300 leading-relaxed space-y-2">
+        <div className="p-3.5 rounded-xl bg-[#F5F7FA] border border-[#E2E8F0] text-xs text-[#64748B] leading-relaxed space-y-1.5">
           <p>
-            <strong>Integration Status:</strong> Coming Soon
+            <strong className="text-[#102A43]">Integration Status:</strong> Coming Soon
           </p>
-          <p className="text-zinc-400">
+          <p>
             {partner.name} integration is in progress. Once connected, this window will
             securely embed their live offerwall so you can start earning Coins.
           </p>
         </div>
 
-        <div className="flex items-center justify-end pt-2">
+        <div className="flex items-center justify-end pt-1">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-full text-xs font-bold bg-white/10 hover:bg-white/20 transition-colors"
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 hover:bg-gray-200 text-[#102A43] transition-colors cursor-pointer"
           >
             Close
           </button>
@@ -231,75 +323,75 @@ export default function PartnerWalls() {
   };
 
   return (
-    <div className="w-full flex flex-col gap-10">
+    <div className="w-full flex flex-col gap-6">
 
       {/* ── SECTION 1: SURVEY PARTNERS ── */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
-              Survey Partners
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                Guaranteed Credit
+            <h3 className="text-base font-bold text-[#102A43] tracking-tight flex items-center gap-2">
+              Survey Routers
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EAF3FF] text-[#1769D2]">
+                Verified Payouts
               </span>
             </h3>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              Verified global survey routers matching surveys directly to your demographic profile.
+            <p className="text-xs text-[#64748B]">
+              Top global survey networks tailored to your profile.
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {SURVEY_PARTNERS.map((partner) => (
             <div
               key={partner.id}
-              className="group relative p-5 rounded-2xl bg-zinc-900/60 border border-white/10 hover:border-indigo-500/40 transition-all flex flex-col justify-between gap-5"
+              className="p-4 rounded-2xl bg-white border border-[#E2E8F0] hover:border-[#1769D2]/40 hover:shadow-xs transition-all flex flex-col justify-between gap-3"
             >
               <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex items-center justify-center font-black text-indigo-300 text-lg">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-[#EAF3FF] flex items-center justify-center font-bold text-[#1769D2] text-sm">
                     {partner.name.slice(0, 2)}
                   </div>
                   <div>
-                    <h4 className="font-extrabold text-base text-white group-hover:text-indigo-400 transition-colors">
+                    <h4 className="font-bold text-sm text-[#102A43]">
                       {partner.name}
                     </h4>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <div className="flex items-center text-amber-400 text-xs">
-                        <Star className="w-3.5 h-3.5 fill-amber-400" />
-                        <span className="font-bold ml-1 text-white text-xs">{partner.rating}</span>
+                      <div className="flex items-center text-amber-500 text-xs">
+                        <Star className="w-3 h-3 fill-amber-400" />
+                        <span className="font-bold ml-1 text-[#102A43] text-xs">{partner.rating}</span>
                       </div>
-                      <span className="text-zinc-600">•</span>
-                      <span className="text-xs text-zinc-400">{partner.category}</span>
+                      <span className="text-[#CBD5E1]">•</span>
+                      <span className="text-xs text-[#64748B]">{partner.category}</span>
                     </div>
                   </div>
                 </div>
 
                 {partner.bonusPercent && (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    <Zap className="w-3 h-3 fill-emerald-400" />
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <Zap className="w-3 h-3 fill-emerald-600" />
                     +{partner.bonusPercent}%
                   </span>
                 )}
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-white/5 text-xs">
+              <div className="flex items-center justify-between pt-2.5 border-t border-[#E2E8F0] text-xs">
                 {partner.isUnlocked ? (
-                  <div className="flex items-center gap-1.5 text-zinc-400">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <div className="flex items-center gap-1 text-emerald-600 font-semibold text-[11px]">
+                    <ShieldCheck className="w-3.5 h-3.5" />
                     <span>Unlocked & Ready</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1.5 text-zinc-500">
+                  <div className="flex items-center gap-1 text-[#94A3B8] text-[11px]">
                     <Lock className="w-3.5 h-3.5" />
-                    <span>Unlocks at Level 2</span>
+                    <span>Unlocks Level 2</span>
                   </div>
                 )}
 
                 <button
                   onClick={() => handleOpenWall(partner)}
                   disabled={!partner.isUnlocked}
-                  className="px-4 py-1.5 rounded-xl bg-white/5 hover:bg-indigo-500 text-zinc-200 hover:text-white font-bold text-xs transition-all flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-3 py-1.5 rounded-xl bg-[#1769D2] hover:bg-[#1558b0] text-white font-bold text-xs transition-all flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-xs"
                 >
                   <span>Open Wall</span>
                   <ExternalLink className="w-3 h-3" />
@@ -311,58 +403,58 @@ export default function PartnerWalls() {
       </div>
 
       {/* ── SECTION 2: OFFER PARTNERS ── */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
-              Offerwall Partners
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                Top Earn Rates
+            <h3 className="text-base font-bold text-[#102A43] tracking-tight flex items-center gap-2">
+              Offerwall Networks
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EAF3FF] text-[#1769D2]">
+                Instant Multipliers
               </span>
             </h3>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              Major rewarded ad networks offering mobile games, app installs, and trial bonuses.
+            <p className="text-xs text-[#64748B]">
+              Major offerwalls for gaming quests, trials, and quick app installs.
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {OFFER_PARTNERS.map((partner) => (
             <div
               key={partner.id}
-              className="group relative p-5 rounded-2xl bg-zinc-900/60 border border-white/10 hover:border-emerald-500/40 transition-all flex flex-col justify-between gap-5"
+              className="p-4 rounded-2xl bg-white border border-[#E2E8F0] hover:border-[#1769D2]/40 hover:shadow-xs transition-all flex flex-col justify-between gap-3"
             >
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
                 <div className="flex items-start justify-between">
-                  <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center font-black text-emerald-300 text-base">
+                  <div className="w-10 h-10 rounded-xl bg-[#EAF3FF] flex items-center justify-center font-bold text-[#1769D2] text-sm">
                     {partner.name.slice(0, 2)}
                   </div>
                   {partner.bonusPercent && (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse">
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                       +{partner.bonusPercent}%
                     </span>
                   )}
                 </div>
 
                 <div>
-                  <h4 className="font-extrabold text-sm text-white group-hover:text-emerald-400 transition-colors">
+                  <h4 className="font-bold text-sm text-[#102A43]">
                     {partner.name}
                   </h4>
-                  <div className="flex items-center gap-1 text-xs text-zinc-400 mt-0.5">
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    <span className="font-bold text-white text-xs">{partner.rating}</span>
-                    <span className="text-zinc-600">•</span>
-                    <span className="text-[11px] text-zinc-500">{partner.tag}</span>
+                  <div className="flex items-center gap-1 text-xs text-[#64748B] mt-0.5">
+                    <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                    <span className="font-bold text-[#102A43] text-xs">{partner.rating}</span>
+                    <span className="text-[#CBD5E1]">•</span>
+                    <span className="text-[11px] text-[#64748B]">{partner.tag}</span>
                   </div>
                 </div>
               </div>
 
               <button
                 onClick={() => handleOpenWall(partner)}
-                className="w-full py-2 rounded-xl bg-white/5 group-hover:bg-emerald-500 text-zinc-300 group-hover:text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5"
+                className="w-full py-2 rounded-xl bg-[#F5F7FA] hover:bg-[#1769D2] text-[#102A43] hover:text-white border border-[#E2E8F0] font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <span>Launch {partner.name}</span>
-                <ExternalLink className="w-3.5 h-3.5" />
+                <ExternalLink className="w-3 h-3" />
               </button>
             </div>
           ))}
@@ -374,7 +466,11 @@ export default function PartnerWalls() {
         <BitLabsWallModal onClose={() => setSelectedPartner(null)} />
       )}
 
-      {selectedPartner && selectedPartner.id !== "bitlabs" && (
+      {selectedPartner?.id === "cpxresearch" && (
+        <CpxWallModal onClose={() => setSelectedPartner(null)} />
+      )}
+
+      {selectedPartner && selectedPartner.id !== "bitlabs" && selectedPartner.id !== "cpxresearch" && (
         <PlaceholderWallModal
           partner={selectedPartner}
           onClose={() => setSelectedPartner(null)}

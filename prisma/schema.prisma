@@ -9,8 +9,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────────
@@ -46,6 +47,7 @@ model User {
   auditLogs            AuditLog[]
   verificationTokens   EmailVerificationToken[]
   passwordResetTokens  PasswordResetToken[]
+  dailyAdWatches       DailyAdWatch[]
 
   @@index([email])
   @@index([referralCode])
@@ -117,6 +119,7 @@ enum TransactionType {
   OFFER_REWARD         // User completed an offerwall task
   SURVEY_REWARD        // User completed a survey
   REFERRAL_REWARD      // Referral commission
+  VIDEO_AD_REWARD      // User watched a rewarded video ad
   WITHDRAWAL_RESERVE   // Coins reserved when withdrawal is requested
   WITHDRAWAL_PAID      // Withdrawal successfully fulfilled
   WITHDRAWAL_REFUND    // Withdrawal failed and coins returned to available
@@ -339,3 +342,28 @@ model PasswordResetToken {
   @@index([userId])
 }
 
+
+// ---------------------------------------------
+// DAILY AD WATCH MODEL
+// Tracks per-user, per-tier ad watches each day.
+// Max 10 ads per tier per calendar day (UTC).
+// Coins per ad: STANDARD=50, GOLD=100, PREMIUM=200
+// ---------------------------------------------
+model DailyAdWatch {
+  id          String   @id @default(cuid())
+  userId      String
+  tier        AdTier
+  watchedAt   DateTime @default(now())
+  coinsEarned Int
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, tier, watchedAt])
+}
+
+enum AdTier {
+  STANDARD
+  GOLD
+  PREMIUM
+}

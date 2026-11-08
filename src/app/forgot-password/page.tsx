@@ -48,10 +48,11 @@ export default function ForgotPasswordPage() {
     setSuccessNotice("");
 
     try {
+      const cleanEmail = email.trim();
       const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: cleanEmail }),
       });
       const data = await res.json();
 
@@ -88,10 +89,11 @@ export default function ForgotPasswordPage() {
     setSuccessNotice("");
 
     try {
+      const cleanEmail = email.trim();
       const res = await fetch("/api/auth/verify-reset-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code: cleanCode }),
+        body: JSON.stringify({ email: cleanEmail, code: cleanCode }),
       });
       const data = await res.json();
 
@@ -126,11 +128,12 @@ export default function ForgotPasswordPage() {
     setErrorMessage("");
 
     try {
+      const cleanEmail = email.trim();
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
+          email: cleanEmail,
           code: code.trim(),
           newPassword: password,
         }),
@@ -218,7 +221,7 @@ export default function ForgotPasswordPage() {
                 </div>
                 <h1 className="text-2xl font-black text-white tracking-tight">Forgot Password?</h1>
                 <p className="text-xs text-zinc-400 max-w-xs">
-                  Enter your registered email address and we'll send you a 6-digit verification code.
+                  Enter your registered email address and we&apos;ll send you a 6-digit verification code.
                 </p>
               </div>
 

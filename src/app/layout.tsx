@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       className={`${inter.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-zinc-950 text-white">
+      <body className="min-h-full flex flex-col bg-[#F5F7FA] text-[#102A43] antialiased">
         <AuthProvider>
           {children}
         </AuthProvider>

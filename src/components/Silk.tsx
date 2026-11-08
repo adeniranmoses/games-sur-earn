@@ -28,11 +28,14 @@ export default function Silk({ children }: { children?: React.ReactNode }) {
     rafId = requestAnimationFrame(raf);
 
     // Initial premium fade-in animation using GSAP
-    gsap.fromTo(
-      ".silk-animate",
-      { opacity: 0, y: 30 },
-      { opacity: 1, y: 0, duration: 1.2, ease: "power3.out", stagger: 0.1 }
-    );
+    const elements = document.querySelectorAll(".silk-animate");
+    if (elements.length > 0) {
+      gsap.fromTo(
+        elements,
+        { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 1.2, ease: "power3.out", stagger: 0.1 }
+      );
+    }
 
     return () => {
       // Cancel the loop FIRST, then destroy lenis

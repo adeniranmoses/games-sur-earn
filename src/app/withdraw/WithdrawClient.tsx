@@ -143,6 +143,13 @@ export default function WithdrawClient({
         text: "Redemption submitted! Your coins have been reserved while the order is verified.",
       });
 
+      // Update global header coins
+      window.dispatchEvent(
+        new CustomEvent("balance-updated", {
+          detail: { newCoins: data.newAvailableCoins },
+        })
+      );
+
       // Add new record to local list
       const newEntry: Redemption = {
         id: data.redemptionId,
@@ -167,17 +174,17 @@ export default function WithdrawClient({
   };
 
   return (
-    <div className="flex flex-col gap-10">
-      {/* Category Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+    <div className="flex flex-col gap-6">
+      {/* Category Filter Pills */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
         {brands.map((b) => (
           <button
             key={b}
             onClick={() => setFilterBrand(b)}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all shrink-0 ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all shrink-0 cursor-pointer ${
               filterBrand === b
-                ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/25"
-                : "bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
+                ? "bg-[#1769D2] text-white shadow-xs"
+                : "bg-white border border-[#E2E8F0] text-[#64748B] hover:text-[#102A43] hover:bg-gray-50"
             }`}
           >
             {b}
@@ -186,56 +193,65 @@ export default function WithdrawClient({
       </div>
 
       {/* Rewards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {filteredProducts.map((product) => {
           const canAfford = availableCoins >= product.coinsCost;
+          const visual = BRAND_VISUALS[product.brand] || FALLBACK_VISUAL;
 
           return (
             <div
               key={product.id}
-              className="group relative flex flex-col justify-between p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-indigo-500/40 transition-all duration-300"
+              className="group relative flex flex-col justify-between p-4 rounded-2xl bg-white border border-[#E2E8F0] hover:border-[#1769D2]/40 hover:shadow-sm transition-all duration-200 overflow-hidden"
             >
-              <div className="flex flex-col gap-4">
-                {/* Header tag */}
-                <div className="flex items-center justify-between">
-                  <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-white/10 text-indigo-300">
+              {/* Artwork Banner */}
+              <div className="relative w-full aspect-[16/9] -mt-4 -mx-4 mb-3 rounded-t-2xl overflow-hidden bg-gray-100">
+                <Image
+                  src={visual.imageSrc || product.imageUrl || "/amazon-card.jpg"}
+                  alt={product.title}
+                  fill
+                  sizes="(max-width: 640px) 100vw, 50vw"
+                  className="object-cover group-hover:scale-102 transition-transform duration-300"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#102A43]/80 via-transparent to-transparent" />
+                
+                <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-white/90 text-[#102A43] shadow-xs">
                     {product.brand}
                   </span>
-                  <span className="text-xs font-bold text-zinc-400">
+                  <span className="text-[10px] font-semibold text-white bg-black/50 px-2 py-0.5 rounded-full backdrop-blur-xs">
                     {product.countryCode === "GLOBAL" ? "Worldwide" : product.countryCode}
                   </span>
                 </div>
+              </div>
 
-                {/* Card Title & Desc */}
-                <div>
-                  <h3 className="text-lg font-bold group-hover:text-indigo-400 transition-colors">
-                    {product.title}
-                  </h3>
-                  <p className="text-xs text-zinc-400 mt-1 line-clamp-2 leading-relaxed">
-                    {product.description}
-                  </p>
-                </div>
+              <div className="flex flex-col gap-1 flex-1">
+                <h3 className="text-sm font-bold text-[#102A43] group-hover:text-[#1769D2] transition-colors">
+                  {product.title}
+                </h3>
+                <p className="text-xs text-[#64748B] line-clamp-2 leading-relaxed">
+                  {product.description}
+                </p>
               </div>
 
               {/* Price & Action */}
-              <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
+              <div className="mt-4 pt-3 border-t border-[#E2E8F0] flex items-center justify-between">
                 <div>
-                  <span className="text-lg font-black text-white">
+                  <span className="text-sm font-bold text-[#102A43]">
                     {product.coinsCost.toLocaleString()}
                   </span>
-                  <span className="text-xs text-zinc-500 ml-1">Coins</span>
-                  <p className="text-[11px] text-zinc-400">
-                    Face value: ${product.faceValue.toFixed(2)}
+                  <span className="text-[11px] text-[#64748B] ml-1">Coins</span>
+                  <p className="text-[10px] font-semibold text-[#1769D2]">
+                    Value: ${product.faceValue.toFixed(2)}
                   </p>
                 </div>
 
                 <button
                   onClick={() => handleOpenModal(product)}
                   disabled={!canAfford}
-                  className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     canAfford
-                      ? "bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg shadow-indigo-500/25 active:scale-95"
-                      : "bg-white/5 text-zinc-600 cursor-not-allowed border border-white/5"
+                      ? "bg-[#1769D2] text-white hover:bg-[#1558b0] active:scale-95 shadow-xs"
+                      : "bg-gray-100 text-[#94A3B8] cursor-not-allowed border border-[#E2E8F0]"
                   }`}
                 >
                   {canAfford ? "Redeem" : "Locked"}
@@ -247,50 +263,50 @@ export default function WithdrawClient({
       </div>
 
       {/* Redemption History Table */}
-      <div className="mt-8 flex flex-col gap-4">
-        <h2 className="text-xl font-bold">Your Redemption Requests</h2>
-        <div className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
+      <div className="mt-4 flex flex-col gap-3">
+        <h2 className="text-sm font-bold text-[#102A43]">Your Redemption History</h2>
+        <div className="rounded-2xl bg-white border border-[#E2E8F0] overflow-hidden shadow-xs">
           {redemptions.length === 0 ? (
-            <div className="py-12 text-center text-zinc-500 text-sm">
+            <div className="py-8 text-center text-[#64748B] text-xs">
               You have not submitted any redemption requests yet.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-white/5 text-zinc-400 font-semibold border-b border-white/10">
+                <thead className="bg-[#F5F7FA] text-[#64748B] font-semibold border-b border-[#E2E8F0]">
                   <tr>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Method</th>
-                    <th className="px-4 py-3">Recipient Address</th>
-                    <th className="px-4 py-3">Amount</th>
-                    <th className="px-4 py-3">Coins Reserved</th>
-                    <th className="px-4 py-3">Status</th>
+                    <th className="px-3 py-2.5">Date</th>
+                    <th className="px-3 py-2.5">Method</th>
+                    <th className="px-3 py-2.5">Address</th>
+                    <th className="px-3 py-2.5">Amount</th>
+                    <th className="px-3 py-2.5">Coins</th>
+                    <th className="px-3 py-2.5">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-[#E2E8F0]">
                   {redemptions.map((r) => (
-                    <tr key={r.id} className="hover:bg-white/[0.02]">
-                      <td className="px-4 py-3.5 text-zinc-400">
+                    <tr key={r.id} className="hover:bg-gray-50/50">
+                      <td className="px-3 py-2.5 text-[#64748B]">
                         {new Date(r.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="px-4 py-3.5 font-bold text-white">{r.payoutMethod}</td>
-                      <td className="px-4 py-3.5 font-mono text-zinc-300 truncate max-w-[180px]">
+                      <td className="px-3 py-2.5 font-bold text-[#102A43]">{r.payoutMethod}</td>
+                      <td className="px-3 py-2.5 font-mono text-[#64748B] truncate max-w-[120px]">
                         {r.payoutAddress}
                       </td>
-                      <td className="px-4 py-3.5 font-bold text-emerald-400">
+                      <td className="px-3 py-2.5 font-bold text-emerald-600">
                         ${r.rewardValue.toFixed(2)}
                       </td>
-                      <td className="px-4 py-3.5 text-zinc-300">
-                        {r.coinsSpent.toLocaleString()} Coins
+                      <td className="px-3 py-2.5 text-[#102A43]">
+                        {r.coinsSpent.toLocaleString()}
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-3 py-2.5">
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                             r.status === "COMPLETED"
-                              ? "bg-emerald-500/20 text-emerald-400"
-                              : r.status === "REJECTED" || r.status === "REFUNDED"
-                              ? "bg-red-500/20 text-red-400"
-                              : "bg-orange-500/20 text-orange-400"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : r.status === "REFUNDED" || r.status === "REVERSED"
+                              ? "bg-rose-50 text-rose-700 border border-rose-200"
+                              : "bg-amber-50 text-amber-700 border border-amber-200"
                           }`}
                         >
                           {r.status}
@@ -307,18 +323,18 @@ export default function WithdrawClient({
 
       {/* Redemption Modal */}
       {selectedProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="relative w-full max-w-md p-6 rounded-3xl bg-zinc-900 border border-white/15 shadow-2xl flex flex-col gap-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in">
+          <div className="relative w-full max-w-sm p-5 rounded-2xl bg-white border border-[#E2E8F0] shadow-xl flex flex-col gap-4">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-lg font-bold">{selectedProduct.title}</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  Cost: {selectedProduct.coinsCost.toLocaleString()} Coins
+                <h3 className="text-base font-bold text-[#102A43]">{selectedProduct.title}</h3>
+                <p className="text-xs text-[#64748B] mt-0.5">
+                  Cost: <span className="font-semibold text-[#1769D2]">{selectedProduct.coinsCost.toLocaleString()} Coins</span>
                 </p>
               </div>
               <button
                 onClick={handleCloseModal}
-                className="p-1 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
+                className="w-7 h-7 rounded-lg hover:bg-gray-100 text-[#64748B] hover:text-[#102A43] transition-colors flex items-center justify-center cursor-pointer text-sm font-bold"
               >
                 ✕
               </button>
@@ -326,19 +342,19 @@ export default function WithdrawClient({
 
             {message && (
               <div
-                className={`p-3 rounded-xl text-xs font-medium border ${
+                className={`p-2.5 rounded-xl text-xs font-medium border ${
                   message.type === "success"
-                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                    : "bg-red-500/10 border-red-500/30 text-red-300"
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                    : "bg-rose-50 border-rose-200 text-rose-800"
                 }`}
               >
                 {message.text}
               </div>
             )}
 
-            <form onSubmit={handleRedeem} className="flex flex-col gap-4">
+            <form onSubmit={handleRedeem} className="flex flex-col gap-3.5">
               <div>
-                <label className="text-xs font-semibold text-zinc-300 block mb-1.5">
+                <label className="text-xs font-semibold text-[#102A43] block mb-1">
                   {selectedProduct.brand === "Crypto" || selectedProduct.brand === "Tether"
                     ? "Your Wallet Address"
                     : "Recipient Email Address"}
@@ -357,41 +373,41 @@ export default function WithdrawClient({
                   }
                   value={payoutAddress}
                   onChange={(e) => setPayoutAddress(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-zinc-950 border border-white/10 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-indigo-500 transition-colors"
+                  className="w-full px-3 py-2 rounded-xl bg-[#F5F7FA] border border-[#E2E8F0] text-xs text-[#102A43] placeholder-[#94A3B8] focus:outline-none focus:border-[#1769D2] transition-colors"
                 />
-                <p className="text-[11px] text-zinc-500 mt-1">
-                  Digital gift card codes or crypto transactions are dispatched to this address.
+                <p className="text-[10px] text-[#64748B] mt-1">
+                  Digital voucher code or transfer confirmation will be sent here.
                 </p>
               </div>
 
-              <div className="p-3 rounded-xl bg-white/5 border border-white/5 text-[11px] text-zinc-400 space-y-1">
+              <div className="p-3 rounded-xl bg-[#F5F7FA] border border-[#E2E8F0] text-xs text-[#64748B] space-y-1">
                 <div className="flex justify-between">
                   <span>Coins to Deduct:</span>
-                  <span className="font-bold text-white">
+                  <span className="font-bold text-[#102A43]">
                     {selectedProduct.coinsCost.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Balance After:</span>
-                  <span className="font-bold text-emerald-400">
+                  <span className="font-bold text-emerald-600">
                     {(availableCoins - selectedProduct.coinsCost).toLocaleString()}
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 mt-2">
+              <div className="flex items-center justify-end gap-2.5 mt-1">
                 <button
                   type="button"
                   onClick={handleCloseModal}
                   disabled={isSubmitting}
-                  className="px-4 py-2 rounded-full text-xs font-semibold hover:bg-white/10 text-zinc-400 transition-colors"
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold hover:bg-gray-100 text-[#64748B] transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-full text-xs font-bold bg-indigo-500 hover:bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#1769D2] hover:bg-[#1558b0] text-white shadow-xs transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {isSubmitting ? "Processing..." : "Confirm Redemption"}
                 </button>

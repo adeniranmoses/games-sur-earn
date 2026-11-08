@@ -5,8 +5,6 @@ import Image from "next/image";
 import { 
   Gamepad2, 
   ClipboardCheck, 
-  Gift, 
-  ShieldCheck, 
   Zap, 
   ArrowRight, 
   Users, 

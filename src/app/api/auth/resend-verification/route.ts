@@ -60,8 +60,7 @@ export async function POST(req: NextRequest) {
     // Send email (or log preview if in dev mode)
     const emailSent = await sendVerificationEmail(user.email, user.name, token);
 
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const devVerifyUrl = `${baseUrl}/verify-email?token=${token}`;
+    const devVerifyUrl = `/verify-email?token=${token}`;
 
     const provideUrlFallback = !emailSent || !process.env.RESEND_API_KEY || process.env.NODE_ENV !== "production";
 

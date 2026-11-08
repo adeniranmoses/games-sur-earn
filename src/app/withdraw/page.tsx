@@ -2,9 +2,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import Link from "next/link";
-import Silk from "@/components/Silk";
-import SignOutButton from "@/components/SignOutButton";
+import { Header } from "@/components/v2/Header";
+import { BottomNav } from "@/components/v2/BottomNav";
 import WithdrawClient from "./WithdrawClient";
 
 export default async function WithdrawPage() {
@@ -13,9 +12,13 @@ export default async function WithdrawPage() {
 
   const userId = (session.user as any).id as string;
 
-  const [wallet, products, redemptions] = await Promise.all([
+  const [wallet, userRecord, products, redemptions] = await Promise.all([
     prisma.wallet.findUnique({
       where: { userId },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { tickets: true },
     }),
     prisma.giftCardProduct.findMany({
       where: { isActive: true },
@@ -32,87 +35,70 @@ export default async function WithdrawPage() {
   const reservedCoins = wallet?.reservedCoins ?? 0;
 
   return (
-    <Silk>
-      <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-indigo-500/30">
-        {/* ── NAVBAR ── */}
-        <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 bg-zinc-950/80 backdrop-blur-md border-b border-white/10">
-          <div className="flex items-center gap-2">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-bold shadow-lg shadow-indigo-500/20">
-                R
-              </div>
-              <span className="font-bold text-xl tracking-tight">RewardPlatform</span>
-            </Link>
+    <div className="min-h-screen bg-[#F5F7FA] text-[#102A43] flex flex-col justify-between selection:bg-[#EAF3FF] selection:text-[#1769D2]">
+      {/* Top Header */}
+      <Header
+        user={{
+          name: session.user.name,
+          email: session.user.email,
+          availableCoins,
+          tickets: userRecord?.tickets ?? 0,
+        }}
+        activeTab="withdraw"
+      />
+
+      {/* Main Container */}
+      <main className="flex-1 max-w-xl w-full mx-auto px-4 pt-5 pb-24">
+        {/* Title Header */}
+        <div className="mb-5">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-[#1769D2] bg-[#EAF3FF] px-2.5 py-1 rounded-full">
+            Rewards Payouts
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight text-[#102A43] mt-2">
+            Redeem Your Earnings
+          </h1>
+          <p className="text-xs text-[#64748B] mt-1">
+            Exchange your verified coins for cryptocurrency, digital vouchers, or bank transfers.
+          </p>
+        </div>
+
+        {/* Quick Balance Summary Card */}
+        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-xs mb-6 grid grid-cols-2 gap-3 divide-x divide-[#E2E8F0]">
+          <div>
+            <span className="text-[11px] font-medium text-[#64748B] block">Available</span>
+            <span className="text-lg font-bold text-[#102A43] block mt-0.5">
+              {availableCoins.toLocaleString()} Coins
+            </span>
+            <span className="text-[11px] font-semibold text-[#1769D2] block mt-0.5">
+              ≈ ${(availableCoins / 1000).toFixed(2)} USD
+            </span>
           </div>
-
-          <div className="hidden md:flex items-center gap-6 text-sm font-medium text-zinc-400">
-            <Link href="/" className="hover:text-white transition-colors">Home</Link>
-            <Link href="/earn" className="hover:text-white transition-colors">Earn</Link>
-            <Link href="/withdraw" className="text-white">Withdraw</Link>
+          <div className="pl-3">
+            <span className="text-[11px] font-medium text-[#64748B] block">Processing</span>
+            <span className="text-lg font-bold text-amber-600 block mt-0.5">
+              {reservedCoins.toLocaleString()} Coins
+            </span>
+            <span className="text-[11px] text-[#64748B] block mt-0.5">In queue</span>
           </div>
+        </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex flex-col items-end">
-              <span className="text-xs text-zinc-500">Available</span>
-              <span className="font-bold text-sm text-emerald-400">
-                {availableCoins.toLocaleString()} Coins
-              </span>
-            </div>
-            <SignOutButton />
-          </div>
-        </nav>
+        {/* Interactive Client Component */}
+        <WithdrawClient
+          initialAvailableCoins={availableCoins}
+          products={products.map((p) => ({
+            ...p,
+            faceValue: Number(p.faceValue),
+          }))}
+          redemptions={redemptions.map((r) => ({
+            ...r,
+            rewardValue: Number(r.rewardValue),
+            createdAt: r.createdAt.toISOString(),
+          }))}
+        />
+      </main>
 
-        {/* ── MAIN CONTENT ── */}
-        <main className="max-w-7xl mx-auto px-6 py-10 flex flex-col gap-10">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-indigo-400">Rewards Catalogue</p>
-              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mt-1">
-                Redeem Your Earnings
-              </h1>
-              <p className="text-zinc-400 mt-1 text-sm md:text-base">
-                Exchange your verified coins for global digital gift cards or instant cryptocurrency payouts.
-              </p>
-            </div>
-
-            {/* Quick Balance Summary Card */}
-            <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl shrink-0">
-              <div>
-                <span className="text-xs text-zinc-400 block">Available Balance</span>
-                <span className="text-xl font-bold text-emerald-400">
-                  {availableCoins.toLocaleString()} Coins
-                </span>
-                <span className="text-xs text-zinc-500 block">
-                  ≈ ${(availableCoins / 1000).toFixed(2)} USD
-                </span>
-              </div>
-              <div className="h-8 w-px bg-white/10" />
-              <div>
-                <span className="text-xs text-zinc-400 block">Reserved Holds</span>
-                <span className="text-xl font-bold text-orange-400">
-                  {reservedCoins.toLocaleString()} Coins
-                </span>
-                <span className="text-xs text-zinc-500 block">In processing</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Interactive Client Component */}
-          <WithdrawClient
-            initialAvailableCoins={availableCoins}
-            products={products.map((p) => ({
-              ...p,
-              faceValue: Number(p.faceValue),
-            }))}
-            redemptions={redemptions.map((r) => ({
-              ...r,
-              rewardValue: Number(r.rewardValue),
-              createdAt: r.createdAt.toISOString(),
-            }))}
-          />
-        </main>
-      </div>
-    </Silk>
+      {/* Bottom Sticky Nav */}
+      <BottomNav activeTab="withdraw" />
+    </div>
   );
 }

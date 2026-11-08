@@ -49,6 +49,66 @@ export async function GET(req: NextRequest) {
       await tx.emailVerificationToken.deleteMany({
         where: { userId: verificationRecord.userId },
       });
+
+      // Credit referral bonuses now that email is verified
+      const verifiedUser = await tx.user.findUnique({
+        where: { id: verificationRecord.userId },
+        select: { referredById: true, id: true, name: true },
+      });
+
+      if (verifiedUser?.referredById) {
+        const newUserWallet = await tx.wallet.findUnique({
+          where: { userId: verifiedUser.id },
+        });
+
+        if (newUserWallet) {
+          // 1. Credit the new user 500 coins (welcome bonus for using a referral)
+          await tx.wallet.update({
+            where: { id: newUserWallet.id },
+            data: {
+              availableCoins: { increment: 500 },
+              lifetimeEarnedCoins: { increment: 500 },
+            },
+          });
+
+          await tx.walletTransaction.create({
+            data: {
+              walletId: newUserWallet.id,
+              type: "ADMIN_CREDIT",
+              coins: 500,
+              status: "APPROVED",
+              description: "🎉 Welcome bonus — joined via referral link",
+              referenceId: `WELCOME-${verifiedUser.id}-${Date.now()}`,
+            },
+          });
+
+          // 2. Credit the referrer 250 coins (signup commission)
+          const referrerWallet = await tx.wallet.findUnique({
+            where: { userId: verifiedUser.referredById },
+          });
+
+          if (referrerWallet) {
+            await tx.wallet.update({
+              where: { id: referrerWallet.id },
+              data: {
+                availableCoins: { increment: 250 },
+                lifetimeEarnedCoins: { increment: 250 },
+              },
+            });
+
+            await tx.walletTransaction.create({
+              data: {
+                walletId: referrerWallet.id,
+                type: "REFERRAL_REWARD",
+                coins: 250,
+                status: "APPROVED",
+                description: `Referral signup bonus: new user verified their email`,
+                referenceId: `REFSIGN-${verifiedUser.id}-${Date.now()}`,
+              },
+            });
+          }
+        }
+      }
     });
 
     return NextResponse.json({
@@ -108,6 +168,66 @@ export async function POST(req: NextRequest) {
       await tx.emailVerificationToken.deleteMany({
         where: { userId: verificationRecord.userId },
       });
+
+      // Credit referral bonuses now that email is verified
+      const verifiedUser = await tx.user.findUnique({
+        where: { id: verificationRecord.userId },
+        select: { referredById: true, id: true, name: true },
+      });
+
+      if (verifiedUser?.referredById) {
+        const newUserWallet = await tx.wallet.findUnique({
+          where: { userId: verifiedUser.id },
+        });
+
+        if (newUserWallet) {
+          // 1. Credit the new user 500 coins (welcome bonus for using a referral)
+          await tx.wallet.update({
+            where: { id: newUserWallet.id },
+            data: {
+              availableCoins: { increment: 500 },
+              lifetimeEarnedCoins: { increment: 500 },
+            },
+          });
+
+          await tx.walletTransaction.create({
+            data: {
+              walletId: newUserWallet.id,
+              type: "ADMIN_CREDIT",
+              coins: 500,
+              status: "APPROVED",
+              description: "🎉 Welcome bonus — joined via referral link",
+              referenceId: `WELCOME-${verifiedUser.id}-${Date.now()}`,
+            },
+          });
+
+          // 2. Credit the referrer 250 coins (signup commission)
+          const referrerWallet = await tx.wallet.findUnique({
+            where: { userId: verifiedUser.referredById },
+          });
+
+          if (referrerWallet) {
+            await tx.wallet.update({
+              where: { id: referrerWallet.id },
+              data: {
+                availableCoins: { increment: 250 },
+                lifetimeEarnedCoins: { increment: 250 },
+              },
+            });
+
+            await tx.walletTransaction.create({
+              data: {
+                walletId: referrerWallet.id,
+                type: "REFERRAL_REWARD",
+                coins: 250,
+                status: "APPROVED",
+                description: `Referral signup bonus: new user verified their email`,
+                referenceId: `REFSIGN-${verifiedUser.id}-${Date.now()}`,
+              },
+            });
+          }
+        }
+      }
     });
 
     return NextResponse.json({

@@ -6,24 +6,13 @@ import {
   Users,
   Wallet,
   Clock,
-  ShieldAlert,
   CheckCircle,
-  XCircle,
   Search,
-  Filter,
-  RefreshCw,
   ExternalLink,
   AlertTriangle,
   FileText,
   DollarSign,
-  ArrowUpRight,
-  UserCheck,
-  UserX,
-  PlusCircle,
-  MinusCircle,
-  Eye,
-  Check,
-  X
+  ArrowUpRight
 } from "lucide-react";
 
 interface UserSummary {
@@ -97,7 +86,7 @@ export default function AdminClient({
   const [activeTab, setActiveTab] = useState<"OVERVIEW" | "REDEMPTIONS" | "USERS" | "AUDIT">("OVERVIEW");
   const [redemptions, setRedemptions] = useState<RedemptionItem[]>(initialRedemptions);
   const [users, setUsers] = useState<UserSummary[]>(initialUsers);
-  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(initialAuditLogs);
+  const [auditLogs] = useState<AuditLogItem[]>(initialAuditLogs);
 
   // Redemptions tab state
   const [redemptionFilter, setRedemptionFilter] = useState<string>("ALL");

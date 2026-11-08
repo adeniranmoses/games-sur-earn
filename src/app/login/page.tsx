@@ -1,7 +1,7 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
@@ -35,15 +35,10 @@ function LoginContent() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState(() =>
+    searchParams?.get("registered") === "true" ? "Account created! Please sign in." : ""
+  );
   const [isLoading, setIsLoading] = useState(false);
-
-  // Show a success message if the user just registered
-  useEffect(() => {
-    if (searchParams?.get("registered") === "true") {
-      setSuccessMessage("Account created! Please sign in.");
-    }
-  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,69 +51,79 @@ function LoginContent() {
     const res = await signIn("credentials", {
       redirect: false,
       email: cleanEmail,
-      password,
+      password: password,
     });
+
+    console.log("[LOGIN] signIn result:", res);
 
     if (res?.error) {
       setIsLoading(false);
-      // NextAuth wraps the error string — check for our sentinel
+      // NextAuth wraps the error string — check for our sentinels
       if (res.error.includes("EMAIL_NOT_VERIFIED")) {
         // Redirect to verify-email page so user can resend the link
-        router.push(`/verify-email?email=${encodeURIComponent(email)}&unverified=true`);
+        router.push(`/verify-email?email=${encodeURIComponent(cleanEmail)}&unverified=true`);
+        return;
+      }
+      if (res.error.includes("banned")) {
+        setError("Your account has been banned.");
+        return;
+      }
+      if (res.error.includes("suspended")) {
+        setError("Your account is temporarily suspended. Please contact support.");
         return;
       }
       setError("Invalid email or password. Please try again.");
       setShowPassword(true); // Show password so user can check what they typed
     } else {
-      router.push("/");
-      router.refresh();
+      const callbackUrl = searchParams?.get("callbackUrl") || "/";
+      window.location.href = callbackUrl;
     }
   };
 
   return (
-    <div className="w-full max-w-md p-8 rounded-3xl bg-white/5 border border-white/10 shadow-2xl backdrop-blur-xl">
+    <div className="w-full max-w-md p-8 rounded-3xl bg-white border border-[#E2E8F0] shadow-sm">
       {/* Logo & Header */}
-      <div className="flex flex-col items-center gap-3 mb-10">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-bold text-xl shadow-lg shadow-indigo-500/20">
+      <div className="flex flex-col items-center gap-3 mb-8">
+        <div className="w-12 h-12 rounded-2xl bg-[#1769D2] flex items-center justify-center font-bold text-xl text-white shadow-xs">
           R
         </div>
-        <h1 className="text-2xl font-bold tracking-tight">Welcome Back</h1>
-        <p className="text-zinc-400 text-sm">Sign in to your RewardPlatform account</p>
+        <h1 className="text-2xl font-bold tracking-tight text-[#102A43]">Welcome Back</h1>
+        <p className="text-[#64748B] text-sm text-center">Sign in to your GamesSurEarn account</p>
       </div>
 
       {/* Success Message (after registration) */}
       {successMessage && (
-        <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm text-center">
+        <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm text-center font-medium">
           ✅ {successMessage}
         </div>
       )}
 
       {/* Error Message */}
       {error && (
-        <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
+        <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm text-center font-medium">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {/* Email */}
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-zinc-300">Email Address</label>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-semibold text-[#102A43]">Email Address</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="px-4 py-3 rounded-xl bg-zinc-900 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-zinc-600"
+            className="px-4 py-3 rounded-xl bg-white border border-[#E2E8F0] focus:border-[#1769D2] focus:ring-1 focus:ring-[#1769D2] text-[#102A43] outline-none transition-all placeholder:text-[#94A3B8]"
             required
           />
         </div>
 
         {/* Password with show/hide toggle */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-zinc-300">Password</label>
-            <Link href="/forgot-password" className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
+            <label className="text-sm font-semibold text-[#102A43]">Password</label>
+            <Link href="/forgot-password" className="text-xs font-semibold text-[#1769D2] hover:underline transition-colors">
               Forgot password?
             </Link>
           </div>
@@ -128,13 +133,13 @@ function LoginContent() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-4 py-3 pr-12 rounded-xl bg-zinc-900 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-zinc-600"
+              className="w-full px-4 py-3 pr-12 rounded-xl bg-white border border-[#E2E8F0] focus:border-[#1769D2] focus:ring-1 focus:ring-[#1769D2] text-[#102A43] outline-none transition-all placeholder:text-[#94A3B8]"
               required
             />
             <button
               type="button"
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#102A43] transition-colors"
               tabIndex={-1}
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
@@ -146,7 +151,7 @@ function LoginContent() {
         <button
           type="submit"
           disabled={isLoading}
-          className="mt-2 w-full py-3.5 rounded-xl bg-indigo-500 text-white font-bold hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2"
+          className="mt-2 w-full py-3.5 rounded-xl bg-[#1769D2] text-white font-bold hover:bg-[#1558b0] transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-xs flex items-center justify-center gap-2 cursor-pointer"
         >
           {isLoading ? (
             <>
@@ -159,17 +164,17 @@ function LoginContent() {
         </button>
       </form>
 
-      <p className="mt-8 text-center text-sm text-zinc-400">
+      <p className="mt-8 text-center text-sm text-[#64748B]">
         Don&apos;t have an account?{" "}
-        <Link href="/register" className="text-indigo-400 font-medium hover:text-indigo-300 transition-colors">
+        <Link href="/register" className="text-[#1769D2] font-bold hover:underline transition-colors">
           Create one
         </Link>
       </p>
 
-      <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-center gap-4 text-xs text-zinc-500">
-        <Link href="/terms" className="hover:text-zinc-400 transition-colors">Terms of Service</Link>
+      <div className="mt-6 pt-4 border-t border-[#E2E8F0] flex items-center justify-center gap-4 text-xs text-[#64748B]">
+        <Link href="/terms" className="hover:text-[#102A43] transition-colors">Terms of Service</Link>
         <span>•</span>
-        <Link href="/privacy" className="hover:text-zinc-400 transition-colors">Privacy Policy</Link>
+        <Link href="/privacy" className="hover:text-[#102A43] transition-colors">Privacy Policy</Link>
       </div>
     </div>
   );
@@ -177,8 +182,8 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-white font-sans selection:bg-indigo-500/30">
-      <Suspense fallback={<div className="text-zinc-400">Loading...</div>}>
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA] text-[#102A43] font-sans selection:bg-[#EAF3FF] selection:text-[#1769D2] p-4">
+      <Suspense fallback={<div className="text-[#64748B]">Loading...</div>}>
         <LoginContent />
       </Suspense>
     </div>

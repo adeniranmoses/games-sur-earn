@@ -25,8 +25,13 @@ const prisma = new PrismaClient(
 );
 
 async function main() {
-  const email = process.argv[2] || 'sarahjoy45@gmail.com';
-  const newPassword = process.argv[3] || 'Password123!';
+  const email = process.argv[2];
+  const newPassword = process.argv[3];
+
+  if (!email || !newPassword) {
+    console.error('Usage: node scripts/reset-password.js <email> <newPassword>');
+    process.exit(1);
+  }
 
   const user = await prisma.user.findUnique({
     where: { email },
@@ -41,12 +46,18 @@ async function main() {
 
   await prisma.user.update({
     where: { email },
-    data: { passwordHash },
+    data: {
+      passwordHash,
+      emailVerified: true,
+      accountStatus: 'ACTIVE',
+    },
   });
 
   console.log(`✅ Success! Password for ${email} has been updated.`);
   console.log(`👉 Email: ${email}`);
   console.log(`👉 New Password: ${newPassword}`);
+  console.log(`👉 Email Verified: true`);
+  console.log(`👉 Account Status: ACTIVE`);
 }
 
 main()

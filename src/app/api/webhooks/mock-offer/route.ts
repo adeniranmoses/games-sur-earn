@@ -17,12 +17,28 @@ import { creditUser } from "@/lib/offerwall";
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Verify optional webhook authorization secret
+    // 0. Mock offer postback is strictly disabled in production environments
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { message: "Forbidden: Mock webhooks are disabled in production." },
+        { status: 403 }
+      );
+    }
+
+    // 1. Verify mandatory webhook authorization secret
     const webhookSecret = process.env.WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error("[MockOffer] WEBHOOK_SECRET is not configured.");
+      return NextResponse.json(
+        { message: "Unauthorized: WEBHOOK_SECRET not configured on server" },
+        { status: 401 }
+      );
+    }
+
     const providedSecret =
       req.headers.get("x-webhook-secret") || req.nextUrl.searchParams.get("secret");
 
-    if (webhookSecret && providedSecret !== webhookSecret) {
+    if (!providedSecret || providedSecret !== webhookSecret) {
       return NextResponse.json({ message: "Unauthorized: Invalid webhook secret" }, { status: 401 });
     }
 

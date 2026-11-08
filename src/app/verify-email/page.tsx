@@ -1,44 +1,44 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Silk from "@/components/Silk";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const token = searchParams?.get("token");
   const emailParam = searchParams?.get("email");
   const isUnverifiedRedirect = searchParams?.get("unverified") === "true";
 
-  const [status, setStatus] = useState<"loading" | "success" | "error" | "resend_mode">("loading");
-  const [message, setMessage] = useState("");
+  const initialStatus: "loading" | "success" | "error" | "resend_mode" =
+    isUnverifiedRedirect && !token ? "resend_mode" : !token ? "error" : "loading";
+
+  const initialMessage =
+    isUnverifiedRedirect && !token
+      ? "You need to verify your email before signing in. Enter your email below to receive a new verification link."
+      : !token
+      ? "No verification token was provided. Please check the link in your email."
+      : "";
+
+  const [status, setStatus] = useState<"loading" | "success" | "error" | "resend_mode">(initialStatus);
+  const [message, setMessage] = useState(initialMessage);
   const [resendEmail, setResendEmail] = useState(emailParam || "");
   const [resendStatus, setResendStatus] = useState<"idle" | "submitting" | "sent" | "failed">("idle");
   const [resendMsg, setResendMsg] = useState("");
   const [devVerifyUrl, setDevVerifyUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    // User was redirected from login because their email is not verified
-    if (isUnverifiedRedirect && !token) {
-      setStatus("resend_mode");
-      setMessage("You need to verify your email before signing in. Enter your email below to receive a new verification link.");
-      return;
-    }
+    if (!token || isUnverifiedRedirect) return;
 
-    if (!token) {
-      setStatus("error");
-      setMessage("No verification token was provided. Please check the link in your email.");
-      return;
-    }
-
+    let ignore = false;
     const verify = async () => {
       try {
         const res = await fetch(`/api/auth/verify-email?token=${encodeURIComponent(token)}`, {
           method: "GET",
         });
         const data = await res.json();
+        if (ignore) return;
 
         if (res.ok) {
           setStatus("success");
@@ -47,13 +47,18 @@ function VerifyEmailContent() {
           setStatus("error");
           setMessage(data.message || "This verification link is invalid or has expired.");
         }
-      } catch (err) {
-        setStatus("error");
-        setMessage("Connection error. Please try again.");
+      } catch {
+        if (!ignore) {
+          setStatus("error");
+          setMessage("Connection error. Please try again.");
+        }
       }
     };
 
     verify();
+    return () => {
+      ignore = true;
+    };
   }, [token, isUnverifiedRedirect]);
 
   const handleResend = async (e: React.FormEvent) => {

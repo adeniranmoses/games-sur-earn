@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck, Lock, Eye, Database } from "lucide-react";
+import { ArrowLeft, ShieldCheck } from "lucide-react";
 
 export const metadata = {
   title: "Privacy Policy – RewardPlatform",

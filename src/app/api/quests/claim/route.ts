@@ -3,6 +3,22 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
+import { assertNoVpn } from "@/lib/fraud";
+
+// Cache to track task visit timestamps for click-through verification
+const questClickCache = new Map<string, number>();
+
+// Evict records older than 1 hour to prevent memory growth
+if (typeof setInterval !== "undefined") {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, timestamp] of questClickCache.entries()) {
+      if (now - timestamp > 60 * 60 * 1000) {
+        questClickCache.delete(key);
+      }
+    }
+  }, 10 * 60 * 1000);
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,13 +29,19 @@ export async function POST(req: NextRequest) {
 
     const userId = (session.user as any).id as string;
 
+    // Security: Block VPN/Proxy/Tor to prevent offerwall reward farming
+    const vpnCheck = await assertNoVpn(req, "quest-claim");
+    if (!vpnCheck.allowed) {
+      return vpnCheck.errorResponse!;
+    }
+
     // Security: Max 15 quest claim calls per minute per user to prevent scripted rapid-fire exploits
     const limit = rateLimit(`quest_claim:${userId}`, 15, 60 * 1000);
     if (!limit.success) {
       return rateLimitExceededResponse(limit);
     }
-    const body = await req.json();
-    const { questId } = body;
+    const body = await req.json().catch(() => ({}));
+    const { questId, action = "claim" } = body;
 
     if (!questId) {
       return NextResponse.json({ message: "Quest ID is required." }, { status: 400 });
@@ -33,17 +55,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "Quest not found or no longer active." }, { status: 404 });
     }
 
+    // ── Handle Action: VISIT (Record click timestamp for verification delay) ──
+    if (action === "visit") {
+      questClickCache.set(`${userId}:${quest.id}`, Date.now());
+      return NextResponse.json({
+        message: `Task opened. Please wait 15 seconds before claiming your reward.`,
+        questId: quest.id,
+      });
+    }
+
+    // Pre-fetch user + wallet OUTSIDE the transaction to reduce queries inside
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { wallet: true },
+    });
+
+    if (!user) {
+      return NextResponse.json({ message: "User not found." }, { status: 404 });
+    }
+
+    // Security: Require email verification before distributing raffle tickets or coins
+    if (!user.emailVerified) {
+      return NextResponse.json(
+        { message: "Please verify your email address to claim quest rewards." },
+        { status: 403 }
+      );
+    }
+
     // Atomic claim execution
     const result = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({
-        where: { id: userId },
-        include: { wallet: true },
-      });
-
-      if (!user) {
-        throw new Error("User not found.");
-      }
-
       const now = new Date();
 
       // ── Handle Daily Streak (Recurring) ──
@@ -58,7 +98,7 @@ export async function POST(req: NextRequest) {
           }
 
           // If within 48h -> streak continues; if > 48h -> streak broke, restart at 1
-          let nextStreak = hoursSinceLast <= 48 ? user.currentStreak + 1 : 1;
+          const nextStreak = hoursSinceLast <= 48 ? user.currentStreak + 1 : 1;
           const nextLongest = Math.max(user.longestStreak, nextStreak);
 
           // Credit coins to user's wallet
@@ -174,6 +214,28 @@ export async function POST(req: NextRequest) {
         throw new Error("You have already completed and claimed this quest.");
       }
 
+      // Security: If the quest involves visiting an external URL (Twitter, Discord, etc.),
+      // verify the user clicked it and waited at least 15 seconds.
+      if (quest.actionUrl) {
+        const cacheKey = `${userId}:${quest.id}`;
+        const visitedAt = questClickCache.get(cacheKey);
+
+        if (!visitedAt) {
+          throw new Error(`Please click "${quest.actionLabel}" to open the task link first.`);
+        }
+
+        const elapsedMs = Date.now() - visitedAt;
+        const minRequiredMs = 15 * 1000;
+
+        if (elapsedMs < minRequiredMs) {
+          const waitSeconds = Math.ceil((minRequiredMs - elapsedMs) / 1000);
+          throw new Error(`Task verification in progress. Please wait ${waitSeconds}s before claiming.`);
+        }
+
+        // Clean up cache entry on successful validation
+        questClickCache.delete(cacheKey);
+      }
+
       // If quest grants Tickets
       let updatedUser = user;
       if (quest.rewardType === "TICKETS") {
@@ -227,6 +289,9 @@ export async function POST(req: NextRequest) {
         rewardGranted: quest.rewardAmount,
         message: `🎉 Quest completed! +${quest.rewardDisplay} credited to your profile!`,
       };
+    }, {
+      maxWait: 15000,
+      timeout: 30000,
     });
 
     return NextResponse.json({

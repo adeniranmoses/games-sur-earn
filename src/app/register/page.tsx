@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2, Gift } from "lucide-react";
 
 // Eye icons for show/hide password
 function EyeIcon() {
@@ -26,16 +26,20 @@ function EyeOffIcon() {
   );
 }
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialRef = (searchParams.get("ref") || searchParams.get("referral") || "").trim().toUpperCase();
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
     country: "NG",
-    referralCode: "",
+    referralCode: initialRef,
   });
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
@@ -79,11 +83,11 @@ export default function RegisterPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
+          name: formData.name.trim(),
+          email: formData.email.trim(),
           password: formData.password,
           country: formData.country,
-          referralCode: formData.referralCode || undefined,
+          referralCode: formData.referralCode?.trim() || undefined,
         }),
       });
 
@@ -97,35 +101,38 @@ export default function RegisterPage() {
 
       // If a devVerifyUrl was returned (sandbox/dev mode), redirect straight there
       if (data.devVerifyUrl) {
-        router.push(data.devVerifyUrl);
+        const target = data.devVerifyUrl.startsWith("http")
+          ? new URL(data.devVerifyUrl).pathname + new URL(data.devVerifyUrl).search
+          : data.devVerifyUrl;
+        router.push(target);
       } else {
         // Production: direct user to check their inbox
-        router.push(`/verify-email?unverified=true&email=${encodeURIComponent(formData.email)}`);
+        router.push(`/verify-email?unverified=true&email=${encodeURIComponent(formData.email.trim())}`);
       }
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-white font-sans selection:bg-indigo-500/30 py-12 px-4">
-      <div className="w-full max-w-md p-8 rounded-3xl bg-white/5 border border-white/10 shadow-2xl backdrop-blur-xl">
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA] text-[#102A43] font-sans selection:bg-[#EAF3FF] selection:text-[#1769D2] py-12 px-4">
+      <div className="w-full max-w-md p-8 rounded-3xl bg-white border border-[#E2E8F0] shadow-sm">
 
         {/* Logo & Header */}
         <div className="flex flex-col items-center gap-3 mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-bold text-xl shadow-lg shadow-indigo-500/20">
+          <div className="w-12 h-12 rounded-2xl bg-[#1769D2] flex items-center justify-center font-bold text-xl text-white shadow-xs">
             R
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Create Account</h1>
-          <p className="text-zinc-400 text-sm text-center">
-            Join RewardPlatform and start earning today
+          <h1 className="text-2xl font-bold tracking-tight text-[#102A43]">Create Account</h1>
+          <p className="text-[#64748B] text-sm text-center">
+            Join GamesSurEarn and start earning today
           </p>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
+          <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm text-center font-medium">
             {error}
           </div>
         )}
@@ -133,8 +140,8 @@ export default function RegisterPage() {
         <form onSubmit={handleSubmit} autoComplete="off" className="flex flex-col gap-4">
 
           {/* Full Name */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-zinc-300">Full Name</label>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-semibold text-[#102A43]">Full Name</label>
             <input
               type="text"
               name="name"
@@ -142,14 +149,14 @@ export default function RegisterPage() {
               onChange={handleChange}
               placeholder="Moses Adeyemi"
               autoComplete="name"
-              className="px-4 py-3 rounded-xl bg-zinc-900 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-zinc-600"
+              className="px-4 py-3 rounded-xl bg-white border border-[#E2E8F0] focus:border-[#1769D2] focus:ring-1 focus:ring-[#1769D2] text-[#102A43] outline-none transition-all placeholder:text-[#94A3B8]"
               required
             />
           </div>
 
           {/* Email */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-zinc-300">Email Address</label>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-semibold text-[#102A43]">Email Address</label>
             <input
               type="email"
               name="email"
@@ -157,19 +164,19 @@ export default function RegisterPage() {
               onChange={handleChange}
               placeholder="you@example.com"
               autoComplete="off"
-              className="px-4 py-3 rounded-xl bg-zinc-900 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-zinc-600"
+              className="px-4 py-3 rounded-xl bg-white border border-[#E2E8F0] focus:border-[#1769D2] focus:ring-1 focus:ring-[#1769D2] text-[#102A43] outline-none transition-all placeholder:text-[#94A3B8]"
               required
             />
           </div>
 
           {/* Country */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-zinc-300">Country</label>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-semibold text-[#102A43]">Country</label>
             <select
               name="country"
               value={formData.country}
               onChange={handleChange}
-              className="px-4 py-3 rounded-xl bg-zinc-900 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all text-white"
+              className="px-4 py-3 rounded-xl bg-white border border-[#E2E8F0] focus:border-[#1769D2] focus:ring-1 focus:ring-[#1769D2] text-[#102A43] outline-none transition-all cursor-pointer"
             >
               <option value="NG">🇳🇬 Nigeria</option>
               <option value="GH">🇬🇭 Ghana</option>
@@ -181,8 +188,8 @@ export default function RegisterPage() {
           </div>
 
           {/* Password */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-zinc-300">Password</label>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-semibold text-[#102A43]">Password</label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -191,13 +198,13 @@ export default function RegisterPage() {
                 onChange={handleChange}
                 placeholder="At least 8 characters"
                 autoComplete="new-password"
-                className="w-full px-4 py-3 pr-12 rounded-xl bg-zinc-900 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-zinc-600"
+                className="w-full px-4 py-3 pr-12 rounded-xl bg-white border border-[#E2E8F0] focus:border-[#1769D2] focus:ring-1 focus:ring-[#1769D2] text-[#102A43] outline-none transition-all placeholder:text-[#94A3B8]"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#102A43] transition-colors"
                 tabIndex={-1}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
@@ -207,8 +214,8 @@ export default function RegisterPage() {
           </div>
 
           {/* Confirm Password */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-zinc-300">Confirm Password</label>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-semibold text-[#102A43]">Confirm Password</label>
             <div className="relative">
               <input
                 type={showConfirmPassword ? "text" : "password"}
@@ -217,17 +224,17 @@ export default function RegisterPage() {
                 onChange={handleChange}
                 placeholder="Repeat your password"
                 autoComplete="new-password"
-                className={`w-full px-4 py-3 pr-12 rounded-xl bg-zinc-900 border outline-none transition-all placeholder:text-zinc-600 ${
+                className={`w-full px-4 py-3 pr-12 rounded-xl bg-white border outline-none transition-all placeholder:text-[#94A3B8] ${
                   passwordMismatch
-                    ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                    : "border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    ? "border-rose-400 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                    : "border-[#E2E8F0] focus:border-[#1769D2] focus:ring-1 focus:ring-[#1769D2]"
                 }`}
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#102A43] transition-colors"
                 tabIndex={-1}
                 aria-label={showConfirmPassword ? "Hide password" : "Show password"}
               >
@@ -236,7 +243,7 @@ export default function RegisterPage() {
             </div>
             {/* Real-time mismatch warning */}
             {passwordMismatch && (
-              <p className="text-xs text-red-400 flex items-center gap-1">
+              <p className="text-xs text-rose-600 font-medium flex items-center gap-1">
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -246,26 +253,38 @@ export default function RegisterPage() {
           </div>
 
           {/* Referral Code (optional) */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-zinc-300">
-              Referral Code <span className="text-zinc-500">(optional)</span>
-            </label>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-semibold text-[#102A43]">
+                Referral Code <span className="text-[#64748B] font-normal">(optional)</span>
+              </label>
+              {formData.referralCode && (
+                <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  <Gift className="w-3 h-3 text-emerald-600" /> +500 Bonus Coins
+                </span>
+              )}
+            </div>
             <input
               type="text"
               name="referralCode"
               value={formData.referralCode}
               onChange={handleChange}
               placeholder="e.g. MOSES123"
-              className="px-4 py-3 rounded-xl bg-zinc-900 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-zinc-600 uppercase"
+              className="px-4 py-3 rounded-xl bg-white border border-[#E2E8F0] focus:border-[#1769D2] focus:ring-1 focus:ring-[#1769D2] text-[#102A43] outline-none transition-all placeholder:text-[#94A3B8] uppercase font-mono"
             />
+            {formData.referralCode && (
+              <p className="text-[11px] text-[#64748B]">
+                🎉 You will receive <strong className="text-[#102A43]">+500 bonus coins</strong> in your wallet when you register!
+              </p>
+            )}
           </div>
 
           {/* Terms notice */}
-          <p className="text-xs text-zinc-500 text-center">
+          <p className="text-xs text-[#64748B] text-center">
             By registering, you agree to our{" "}
-            <Link href="/terms" className="text-indigo-400 hover:underline">Terms of Service</Link>
+            <Link href="/terms" className="text-[#1769D2] hover:underline">Terms of Service</Link>
             {" "}and{" "}
-            <Link href="/privacy" className="text-indigo-400 hover:underline">Privacy Policy</Link>.
+            <Link href="/privacy" className="text-[#1769D2] hover:underline">Privacy Policy</Link>.
             Rewards are subject to verification and are not guaranteed income.
           </p>
 
@@ -273,7 +292,7 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={isLoading || passwordMismatch}
-            className="mt-2 w-full py-3.5 rounded-xl bg-indigo-500 text-white font-bold hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2"
+            className="mt-2 w-full py-3.5 rounded-xl bg-[#1769D2] text-white font-bold hover:bg-[#1558b0] transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-xs flex items-center justify-center gap-2 cursor-pointer"
           >
             {isLoading ? (
               <>
@@ -286,13 +305,31 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-zinc-400">
+        <p className="mt-6 text-center text-sm text-[#64748B]">
           Already have an account?{" "}
-          <Link href="/login" className="text-indigo-400 font-medium hover:text-indigo-300 transition-colors">
+          <Link href="/login" className="text-[#1769D2] font-bold hover:underline transition-colors">
             Sign In
           </Link>
         </p>
       </div>
     </div>
+  );
+}
+
+import BrandLoader from "@/components/BrandLoader";
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <BrandLoader
+          message="Loading Registration..."
+          submessage="Setting up your referral welcome bonus..."
+          fullPage={true}
+        />
+      }
+    >
+      <RegisterForm />
+    </Suspense>
   );
 }

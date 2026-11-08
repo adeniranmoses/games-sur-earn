@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { NextAuthOptions } from "next-auth";
 
 export const authOptions: NextAuthOptions = {
-  secret: process.env.NEXTAUTH_SECRET || "9dfbafdbf65854281304a5f17f9b03adcb9242c926a69054d4a98fa0103be212",
+  secret: process.env.NEXTAUTH_SECRET,
   session: {
     strategy: "jwt",
   },
@@ -26,6 +26,9 @@ export const authOptions: NextAuthOptions = {
         }
 
         const normalizedEmail = credentials.email.toLowerCase().trim();
+        if (process.env.NODE_ENV !== "production") {
+          console.log(`[AUTH] Login attempt for email: "${normalizedEmail}", password length: ${credentials.password.length}`);
+        }
 
         // Find the user in our database
         const user = await prisma.user.findUnique({
@@ -33,16 +36,33 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user) {
+          if (process.env.NODE_ENV !== "production") {
+            console.log(`[AUTH] User not found for email: "${normalizedEmail}"`);
+          }
           throw new Error("Invalid email or password");
         }
 
         // Verify the password using bcrypt (never compare plain text!)
-        const isPasswordValid = await bcrypt.compare(
+        let isPasswordValid = await bcrypt.compare(
           credentials.password,
           user.passwordHash
         );
 
+        if (!isPasswordValid && credentials.password.trim() !== credentials.password) {
+          isPasswordValid = await bcrypt.compare(
+            credentials.password.trim(),
+            user.passwordHash
+          );
+        }
+
+        if (process.env.NODE_ENV !== "production") {
+          console.log(`[AUTH] User found (${user.id}), password valid: ${isPasswordValid}, status: ${user.accountStatus}, emailVerified: ${user.emailVerified}`);
+        }
+
         if (!isPasswordValid) {
+          if (process.env.NODE_ENV !== "production") {
+            console.log(`[AUTH] Password comparison failed!`);
+          }
           throw new Error("Invalid email or password");
         }
 
@@ -56,6 +76,9 @@ export const authOptions: NextAuthOptions = {
 
         // Require email verification before login
         if (!user.emailVerified) {
+          if (process.env.NODE_ENV !== "production") {
+            console.log(`[AUTH] Email not verified!`);
+          }
           throw new Error("EMAIL_NOT_VERIFIED");
         }
 

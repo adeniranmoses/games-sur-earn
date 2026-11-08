@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
+import { assertNoVpn } from "@/lib/fraud";
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,6 +13,12 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = (session.user as any).id as string;
+
+    // Security: Block VPN/Proxy/Tor to prevent fraudulent withdrawal attempts
+    const vpnCheck = await assertNoVpn(req, "redemption");
+    if (!vpnCheck.allowed) {
+      return vpnCheck.errorResponse!;
+    }
 
     // Rate limit: Max 5 redemption requests per 10 minutes per user
     const limit = rateLimit(`redemption:${userId}`, 5, 10 * 60 * 1000);
@@ -109,6 +116,9 @@ export async function POST(req: NextRequest) {
       });
 
       return { updatedWallet, redemption, ledgerEntry };
+    }, {
+      maxWait: 15000,
+      timeout: 30000,
     });
 
     return NextResponse.json(

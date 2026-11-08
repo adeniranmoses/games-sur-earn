@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck, Scale, AlertTriangle, FileText } from "lucide-react";
+import { ArrowLeft, Scale } from "lucide-react";
 
 export const metadata = {
   title: "Terms of Service – RewardPlatform",

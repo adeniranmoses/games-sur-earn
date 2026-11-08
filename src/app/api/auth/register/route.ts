@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, getClientIp, rateLimitExceededResponse } from "@/lib/rate-limit";
 import { sendVerificationEmail } from "@/lib/email";
+import { assertNoVpn } from "@/lib/fraud";
 
 // This function generates a unique referral code like "MOSES123"
 function generateReferralCode(name: string): string {
@@ -19,6 +20,12 @@ export async function POST(req: NextRequest) {
     const limit = rateLimit(`register:${ip}`, 5, 10 * 60 * 1000);
     if (!limit.success) {
       return rateLimitExceededResponse(limit);
+    }
+
+    // Security: Block VPN/Proxy/Tor signups to prevent multi-account fraud
+    const vpnCheck = await assertNoVpn(req, "registration");
+    if (!vpnCheck.allowed) {
+      return vpnCheck.errorResponse!;
     }
 
     const body = await req.json();
@@ -77,7 +84,7 @@ export async function POST(req: NextRequest) {
     const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     // --- Atomic User + Wallet + VerificationToken creation ---
-    const { user, tokenRecord } = await prisma.$transaction(async (tx) => {
+    const { user } = await prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
           name,
@@ -98,7 +105,7 @@ export async function POST(req: NextRequest) {
       });
 
       // Create email verification token
-      const tokenRec = await tx.emailVerificationToken.create({
+      await tx.emailVerificationToken.create({
         data: {
           userId: newUser.id,
           token: verificationToken,
@@ -116,21 +123,19 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      return { user: newUser, tokenRecord: tokenRec };
+      return { user: newUser };
     });
 
     // Send transactional verification email
-    let emailSent = false;
     try {
-      emailSent = await sendVerificationEmail(user.email, user.name, verificationToken);
+      await sendVerificationEmail(user.email, user.name, verificationToken);
     } catch (err) {
       console.error("Failed to send verification email:", err);
     }
 
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const devVerifyUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
+    const devVerifyUrl = `/verify-email?token=${verificationToken}`;
 
-    const provideUrlFallback = !emailSent || !process.env.RESEND_API_KEY || process.env.NODE_ENV !== "production";
+    const provideUrlFallback = process.env.NODE_ENV !== "production";
 
     return NextResponse.json(
       {

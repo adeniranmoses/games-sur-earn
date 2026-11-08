@@ -1,7 +1,11 @@
+import nodemailer, { type Transporter } from "nodemailer";
+
 /**
  * Transactional Email Service
- * Supports Resend API out of the box with zero third-party SDK dependencies (uses native fetch).
- * In development or when no API key is provided, logs a rich preview with the clickable link to the console.
+ * Supports:
+ *   1. Gmail SMTP (via nodemailer and 16-character Google App Password) — No domain required!
+ *   2. Resend API (via native fetch) — When custom domain is verified
+ *   3. Console Mock — Safe fallback when neither is configured
  */
 
 interface SendEmailParams {
@@ -11,21 +15,65 @@ interface SendEmailParams {
   text?: string;
 }
 
+let smtpTransporter: Transporter | null = null;
+
+function getSmtpTransporter() {
+  const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER;
+  const smtpPass = (process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || "").replace(/\s+/g, "");
+
+  if (!smtpUser || !smtpPass) return null;
+
+  if (!smtpTransporter) {
+    smtpTransporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+    });
+  }
+
+  return { transporter: smtpTransporter, user: smtpUser };
+}
+
 export async function sendEmail({ to, subject, html, text }: SendEmailParams): Promise<{ success: boolean; id?: string; error?: string }> {
+  // ── 1. Priority: Gmail SMTP (No domain required, delivers to any inbox) ──
+  const smtp = getSmtpTransporter();
+  if (smtp) {
+    try {
+      const fromEmail = process.env.EMAIL_FROM || `FreeRewards <${smtp.user}>`;
+      const plainText = text || html.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim();
+
+      const info = await smtp.transporter.sendMail({
+        from: fromEmail,
+        to,
+        subject,
+        html,
+        text: plainText,
+      });
+
+      console.log(`[EMAIL] Dispatched via Gmail SMTP to "${to}" (Message ID: ${info.messageId})`);
+      return { success: true, id: info.messageId };
+    } catch (smtpError: any) {
+      console.error("[EMAIL] Gmail SMTP failed:", smtpError.message);
+      return { success: false, error: smtpError.message };
+    }
+  }
+
+  // ── 2. Secondary: Resend API (When custom domain is configured) ──
   const apiKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.EMAIL_FROM || "RewardPlatform <noreply@rewardplatform.com>";
 
   if (!apiKey) {
     // Development / Sandbox mode: Log cleanly to console so developer is never blocked
     console.log("\n=======================================================");
-    console.log("📨 [MOCK EMAIL DISPATCH] (No RESEND_API_KEY configured)");
+    console.log("📨 [MOCK EMAIL DISPATCH] (No SMTP_PASS or RESEND_API_KEY configured)");
     console.log(`➡️  To: ${to}`);
     console.log(`📌 Subject: ${subject}`);
     console.log("-------------------------------------------------------");
     if (text) {
       console.log(text);
     } else {
-      // Strip basic HTML tags for console readability
       const plain = html.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim();
       console.log(plain);
     }
@@ -52,7 +100,15 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
 
     const data = await res.json();
     if (!res.ok) {
-      console.error("Resend API error:", data);
+      if (typeof data?.message === "string" && data.message.includes("testing emails to your own email address")) {
+        console.warn(
+          `\n⚠️ [RESEND TEST DOMAIN RESTRICTION]: Resend's free "onboarding@resend.dev" only sends to the email address you registered your Resend account with.\n` +
+          `➡️ Intended recipient: ${to}\n` +
+          `💡 Tip: You can now use your Gmail App Password in .env (SMTP_PASS="xxxx xxxx xxxx xxxx") to deliver directly to any user inbox without a domain!\n`
+        );
+      } else {
+        console.error("Resend API error:", data);
+      }
       return { success: false, error: data?.message || "Failed to send email" };
     }
 

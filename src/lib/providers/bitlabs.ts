@@ -35,12 +35,13 @@ export class BitLabsAdapter implements OfferwallProviderAdapter {
    * Returns the BitLabs survey wall URL for embedding.
    * In sandbox mode (no token set), returns a local placeholder URL.
    */
-  generateLaunchUrl(userId: string, _userCountry?: string): string {
+  generateLaunchUrl(userId: string, userCountry?: string): string {
     if (!this.appToken) {
       // Dev sandbox: local placeholder so UI doesn't break
       return `/earn?sandbox=bitlabs&uid=${encodeURIComponent(userId)}`;
     }
     const params = new URLSearchParams({ token: this.appToken, uid: userId });
+    if (userCountry) params.set("country", userCountry);
     return `https://web.bitlabs.ai/?${params.toString()}`;
   }
 
