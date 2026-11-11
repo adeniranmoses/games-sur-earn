@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Loader2, Trophy, RotateCw } from "lucide-react";
 import { WHEEL_SEGMENTS, MAX_SPINS_PER_DAY } from "@/lib/games";
+import { GameAdGateModal } from "./GameAdGateModal";
+import { AD_CONFIG } from "@/lib/ads-config";
 
 interface SpinResponse {
   success: boolean;
@@ -42,6 +44,7 @@ export function LuckySpinWheel() {
   const [rotationDegree, setRotationDegree] = useState<number>(0);
   const [winMessage, setWinMessage] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showAdModal, setShowAdModal] = useState<boolean>(false);
 
   const currentRotationRef = useRef<number>(0);
 
@@ -58,7 +61,16 @@ export function LuckySpinWheel() {
       .catch(() => {});
   }, []);
 
-  const handleSpin = async () => {
+  const onSpinClick = () => {
+    if (isSpinning || remainingSpins <= 0) return;
+    if (AD_CONFIG.enabledForGames) {
+      setShowAdModal(true);
+    } else {
+      executeSpin();
+    }
+  };
+
+  const executeSpin = async () => {
     if (isSpinning || remainingSpins <= 0) return;
 
     setIsSpinning(true);
@@ -226,7 +238,7 @@ export function LuckySpinWheel() {
 
         {/* Center Hub Button */}
         <button
-          onClick={handleSpin}
+          onClick={onSpinClick}
           disabled={isSpinning || remainingSpins <= 0}
           className="absolute z-10 w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-[#102A43] border-4 border-amber-400 text-white font-black text-xs flex flex-col items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
         >
@@ -245,7 +257,7 @@ export function LuckySpinWheel() {
 
       {/* Action / Trigger Button */}
       <button
-        onClick={handleSpin}
+        onClick={onSpinClick}
         disabled={isSpinning || remainingSpins <= 0}
         className={`w-full py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer ${
           isSpinning
@@ -269,6 +281,18 @@ export function LuckySpinWheel() {
           </>
         )}
       </button>
+
+      {/* Rewarded Ad Interstitial Gate */}
+      <GameAdGateModal
+        isOpen={showAdModal}
+        gameTitle="Lucky Spin Wheel"
+        gameIcon="🎡"
+        onAdCompleted={() => {
+          setShowAdModal(false);
+          executeSpin();
+        }}
+        onCancel={() => setShowAdModal(false)}
+      />
     </div>
   );
 }

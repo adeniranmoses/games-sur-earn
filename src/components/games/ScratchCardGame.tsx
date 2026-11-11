@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Loader2, Sparkles, RefreshCw, Trophy, Gift } from "lucide-react";
+import { GameAdGateModal } from "./GameAdGateModal";
+import { AD_CONFIG } from "@/lib/ads-config";
 
 interface ScratchPrize {
   label: string;
@@ -22,6 +24,7 @@ export function ScratchCardGame() {
   const [claimed, setClaimed] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showAdModal, setShowAdModal] = useState<boolean>(false);
 
   const isDrawing = useRef(false);
 
@@ -77,6 +80,15 @@ export function ScratchCardGame() {
       })
       .catch(() => {});
   }, []);
+
+  const onNewCardClick = () => {
+    if (isGenerating || remainingScratches <= 0) return;
+    if (AD_CONFIG.enabledForGames) {
+      setShowAdModal(true);
+    } else {
+      startNewCard();
+    }
+  };
 
   // Request new scratch card from server
   const startNewCard = async () => {
@@ -309,7 +321,7 @@ export function ScratchCardGame() {
 
         {(!prize || claimed) && (
           <button
-            onClick={startNewCard}
+            onClick={onNewCardClick}
             disabled={isGenerating || remainingScratches <= 0}
             className="w-full h-11 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition active:scale-95 cursor-pointer"
           >
@@ -336,6 +348,18 @@ export function ScratchCardGame() {
           </div>
         )}
       </div>
+
+      {/* Rewarded Ad Gate */}
+      <GameAdGateModal
+        isOpen={showAdModal}
+        gameTitle="Scratch & Win"
+        gameIcon="🎟️"
+        onAdCompleted={() => {
+          setShowAdModal(false);
+          startNewCard();
+        }}
+        onCancel={() => setShowAdModal(false)}
+      />
     </div>
   );
 }

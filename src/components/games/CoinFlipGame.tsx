@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { Loader2, Coins, ShieldCheck, Sparkles, RefreshCw } from "lucide-react";
+import { GameAdGateModal } from "./GameAdGateModal";
+import { AD_CONFIG } from "@/lib/ads-config";
 
 export function CoinFlipGame() {
   const [choice, setChoice] = useState<"HEADS" | "TAILS">("HEADS");
@@ -14,6 +16,7 @@ export function CoinFlipGame() {
   const [availableCoins, setAvailableCoins] = useState<number>(0);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [provablyFair, setProvablyFair] = useState<{ serverHash: string; clientSeed: string } | null>(null);
+  const [showAdModal, setShowAdModal] = useState<boolean>(false);
 
   useEffect(() => {
     fetch("/api/games/coinflip")
@@ -27,6 +30,15 @@ export function CoinFlipGame() {
       })
       .catch(() => {});
   }, []);
+
+  const onFlipClick = () => {
+    if (isFlipping) return;
+    if (mode === "FREE" && AD_CONFIG.enabledForGames) {
+      setShowAdModal(true);
+    } else {
+      handleFlip();
+    }
+  };
 
   const handleFlip = async () => {
     if (isFlipping) return;
@@ -207,7 +219,7 @@ export function CoinFlipGame() {
       {/* Action Button */}
       <div className="w-full max-w-xs flex flex-col gap-2">
         <button
-          onClick={handleFlip}
+          onClick={onFlipClick}
           disabled={isFlipping}
           className="w-full h-11 rounded-xl bg-[#1769D2] hover:bg-[#1557B0] disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition active:scale-95 cursor-pointer"
         >
@@ -248,6 +260,18 @@ export function CoinFlipGame() {
           </div>
         )}
       </div>
+
+      {/* Rewarded Ad Gate */}
+      <GameAdGateModal
+        isOpen={showAdModal}
+        gameTitle="Free Coin Flip"
+        gameIcon="🪙"
+        onAdCompleted={() => {
+          setShowAdModal(false);
+          handleFlip();
+        }}
+        onCancel={() => setShowAdModal(false)}
+      />
     </div>
   );
 }
