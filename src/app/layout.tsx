@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import AuthProvider from "@/components/AuthProvider";
 
@@ -28,6 +29,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[#F5F7FA] text-[#102A43] antialiased">
+        {process.env.NEXT_PUBLIC_MONETAG_ZONE_ID && (
+          <Script
+            src="https://alwingulla.com/88/tag.min.js"
+            data-zone={process.env.NEXT_PUBLIC_MONETAG_ZONE_ID}
+            strategy="afterInteractive"
+          />
+        )}
         <AuthProvider>
           {children}
         </AuthProvider>

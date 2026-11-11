@@ -100,6 +100,20 @@ export function GameAdGateModal({
       })
       .catch(() => {});
 
+    // Option: Trigger Monetag Rewarded Interstitial SDK if loaded on window
+    if (AD_CONFIG.network === "monetag" && AD_CONFIG.monetagZoneId) {
+      const zoneFnName = `show_${AD_CONFIG.monetagZoneId}`;
+      if (typeof (window as any)[zoneFnName] === "function") {
+        (window as any)[zoneFnName]()
+          .then(() => {
+            if (mounted) finishAdAndUnlock();
+          })
+          .catch((err: any) => {
+            console.warn("[Monetag] Interstitial dismissed or fallback needed:", err);
+          });
+      }
+    }
+
     // Auto-play video
     if (videoRef.current) {
       videoRef.current.currentTime = 0;
