@@ -4,10 +4,13 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Play,
   PlayCircle,
-  CheckCircle2,
   Tv2,
   Loader2,
   Lock,
+  Volume2,
+  VolumeX,
+  AlertTriangle,
+  ExternalLink,
 } from "lucide-react";
 
 interface AdTierInfo {
@@ -26,6 +29,9 @@ const TIER_CONFIG = {
     duration: 15,
     badge: "bg-gray-100 text-[#102A43]",
     icon: "📺",
+    videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+    title: "⚔️ Raid Legends: Battle for the Realm",
+    sponsor: "Google Cloud CDN Verified Sponsor",
   },
   GOLD: {
     label: "Gold",
@@ -33,6 +39,9 @@ const TIER_CONFIG = {
     duration: 20,
     badge: "bg-amber-50 text-amber-700 border border-amber-200",
     icon: "⭐",
+    videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+    title: "🚀 Galaxy Odyssey: Space Exploration MMO",
+    sponsor: "Top Tier Ad Network Partner",
   },
   PREMIUM: {
     label: "Premium",
@@ -40,6 +49,9 @@ const TIER_CONFIG = {
     duration: 30,
     badge: "bg-[#EAF3FF] text-[#1769D2] border border-[#BFDBFE]",
     icon: "💎",
+    videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+    title: "🏎️ Velocity Horizon: Hyper Real Racing",
+    sponsor: "Premium Brand Direct Campaign",
   },
 } as const;
 
@@ -51,12 +63,19 @@ export default function AdsClient({
   const [tiers, setTiers] = useState<AdTierInfo[]>(initialTiers);
   const [activeTier, setActiveTier] = useState<AdTierInfo["tier"]>("STANDARD");
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPausedDueToBlur, setIsPausedDueToBlur] = useState(false);
   const [progress, setProgress] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [isMuted, setIsMuted] = useState(true);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activeSessionToken = useRef<string | null>(null);
+  const elapsedSecondsRef = useRef<number>(0);
+  const requiredDurationRef = useRef<number>(15);
 
   const currentTierInfo = tiers.find((t) => t.tier === activeTier) || tiers[0];
   const cfg = TIER_CONFIG[activeTier];
@@ -79,11 +98,33 @@ export default function AdsClient({
 
   const isCurrentLocked = tierLocked[activeTier];
 
+  // Anti-Tab-Switch (Visibility API) Guard:
+  // Industry-standard anti-fraud: Pauses if user minimizes window or switches browser tabs
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (isPlaying) {
+          setIsPausedDueToBlur(true);
+          if (videoRef.current) {
+            videoRef.current.pause();
+          }
+        }
+      } else {
+        if (isPlaying) {
+          setIsPausedDueToBlur(false);
+          if (videoRef.current) {
+            videoRef.current.play().catch(() => {});
+          }
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, []);
+  }, [isPlaying]);
 
   const startAd = async () => {
     if (isPlaying || isStarting || isRecording || isCurrentLocked || currentTierInfo.remaining === 0) return;
@@ -107,21 +148,42 @@ export default function AdsClient({
       const token = data.sessionToken;
       const duration = data.duration || cfg.duration;
 
+      activeSessionToken.current = token;
+      requiredDurationRef.current = duration;
+      elapsedSecondsRef.current = 0;
+
       setIsPlaying(true);
+      setIsPausedDueToBlur(false);
       setProgress(0);
       setSecondsLeft(duration);
 
-      let elapsed = 0;
-      timerRef.current = setInterval(() => {
-        elapsed++;
-        const pct = Math.min((elapsed / duration) * 100, 100);
-        setProgress(pct);
-        setSecondsLeft(Math.max(0, duration - elapsed));
+      // Play video
+      if (videoRef.current) {
+        videoRef.current.currentTime = 0;
+        videoRef.current.play().catch((err) => {
+          console.warn("Video auto-play prevented:", err);
+        });
+      }
 
-        if (elapsed >= duration) {
+      // Start elapsed timer (pauses if tab hidden)
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => {
+        if (document.hidden) return; // Freeze timer if user leaves tab
+
+        elapsedSecondsRef.current += 1;
+        const currentElapsed = elapsedSecondsRef.current;
+        const dur = requiredDurationRef.current;
+        const pct = Math.min((currentElapsed / dur) * 100, 100);
+
+        setProgress(pct);
+        setSecondsLeft(Math.max(0, dur - currentElapsed));
+
+        if (currentElapsed >= dur) {
           if (timerRef.current) clearInterval(timerRef.current);
           setIsPlaying(false);
-          handleClaimReward(token);
+          if (activeSessionToken.current) {
+            handleClaimReward(activeSessionToken.current);
+          }
         }
       }, 1000);
     } catch {
@@ -157,13 +219,11 @@ export default function AdsClient({
       // Real-time update global header coins
       window.dispatchEvent(
         new CustomEvent("balance-updated", {
-          detail: {
-            newCoins: data.newBalance,
-            coinsDelta: data.coinsEarned || currentTierInfo.coinsPerAd,
-          },
+          detail: { coinsDelta: data.coinsEarned || currentTierInfo.coinsPerAd },
         })
       );
 
+      // Refresh tier counts locally
       setTiers((prev) =>
         prev.map((t) =>
           t.tier === activeTier
@@ -200,14 +260,13 @@ export default function AdsClient({
       <section className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-xs space-y-2">
         <div className="flex items-center gap-2 text-xs font-bold text-[#1769D2]">
           <PlayCircle className="w-4 h-4" />
-          <span>Rewarded Sponsor Video Stream</span>
+          <span>Real Rewarded Video Sponsor Network</span>
         </div>
         <h2 className="text-base sm:text-lg font-bold text-[#102A43] tracking-tight">
-          Watch Short Video Clips &amp; Earn Verified Coins
+          Watch Short Video Ads &amp; Earn Verified Coins
         </h2>
         <p className="text-xs text-[#64748B] leading-relaxed">
-          Watch short video clips to completion to receive instant coin rewards. 
-          Each tier allows up to 10 daily watches and resets at 00:00 UTC.
+          Stream real sponsored videos to completion to earn instant coins. Complete the video without switching tabs to receive verified credit directly to your ledger.
         </p>
       </section>
 
@@ -262,7 +321,7 @@ export default function AdsClient({
                     {tierLockReason[tierKey]}
                   </p>
                 ) : (
-                  <p className="text-[11px] text-[#64748B] mt-0.5">{tCfg.duration}s duration</p>
+                  <p className="text-[11px] text-[#64748B] mt-0.5">{tCfg.duration}s stream</p>
                 )}
               </div>
 
@@ -283,7 +342,7 @@ export default function AdsClient({
         })}
       </div>
 
-      {/* ── Interactive Video Player Card ── */}
+      {/* ── Interactive Real Video Player Card ── */}
       <section className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-xs flex flex-col gap-4 relative overflow-hidden">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -292,10 +351,10 @@ export default function AdsClient({
             </div>
             <div>
               <h3 className="text-sm font-bold text-[#102A43]">
-                {cfg.label} Ad Stream
+                {cfg.label} Sponsor Video
               </h3>
               <p className="text-xs text-[#64748B]">
-                +{currentTierInfo.coinsPerAd} Coins · Value ${(currentTierInfo.coinsPerAd / 1000).toFixed(2)}
+                +{currentTierInfo.coinsPerAd} Coins &bull; Value ${(currentTierInfo.coinsPerAd / 1000).toFixed(2)} USD
               </p>
             </div>
           </div>
@@ -310,129 +369,144 @@ export default function AdsClient({
           </div>
         </div>
 
-        {/* Video Simulation Canvas */}
-        <div className="relative w-full aspect-[16/9] sm:aspect-[21/9] rounded-xl bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0B1120] flex flex-col items-center justify-center p-6 text-center text-white overflow-hidden shadow-inner border border-white/10">
-          {isPlaying ? (
-            <div className="w-full h-full flex flex-col items-center justify-between py-2 relative z-10">
-              {/* Top video HUD */}
-              <div className="w-full flex items-center justify-between text-xs">
-                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-md text-amber-300 font-bold border border-amber-500/30 text-[10px] uppercase tracking-wider">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-                  Sponsored Stream
-                </span>
-                <span className="px-3 py-1 rounded-full bg-[#1769D2]/90 backdrop-blur-md text-white font-extrabold text-xs shadow-md border border-white/20">
-                  Reward in {secondsLeft}s
-                </span>
-              </div>
+        {/* Video Player Canvas */}
+        <div className="relative w-full aspect-[16/9] sm:aspect-[21/9] rounded-xl bg-black flex flex-col items-center justify-center text-center text-white overflow-hidden shadow-inner border border-white/10 select-none">
+          {/* Real HTML5 Video element */}
+          <video
+            ref={videoRef}
+            src={cfg.videoSrc}
+            muted={isMuted}
+            playsInline
+            preload="auto"
+            className={`w-full h-full object-cover transition-opacity duration-300 ${
+              isPlaying ? "opacity-100" : "opacity-30"
+            }`}
+          />
 
-              {/* Center animated visual */}
-              <div className="flex flex-col items-center gap-2 my-auto">
-                <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-xl animate-pulse">
-                  <Tv2 className="w-7 h-7 text-[#60A5FA]" />
-                </div>
-                <div>
-                  <span className="text-sm font-extrabold text-white tracking-wide block">
-                    {activeTier === "STANDARD"
-                      ? "⚔️ Hero Quest: Mobile Legends"
-                      : activeTier === "GOLD"
-                      ? "📈 CryptoTrade Pro: Zero Fees"
-                      : "💎 CyberWorld: Open World MMO"}
-                  </span>
-                  <span className="text-[11px] text-blue-200/80 font-medium">
-                    Verified Sponsor • Streaming High Definition Clip
-                  </span>
-                </div>
-              </div>
-
-              {/* Bottom notice */}
-              <div className="text-[11px] text-gray-400 font-medium">
-                Keep this window in focus to verify stream completion
-              </div>
-            </div>
-          ) : isRecording ? (
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
-              <span className="text-xs font-bold text-amber-300">Crediting coins to ledger…</span>
-            </div>
-          ) : isCurrentLocked ? (
-            <div className="flex flex-col items-center gap-2 text-center">
-              <Lock className="w-8 h-8 text-amber-400" />
-              <span className="text-sm font-bold text-white">Tier Locked</span>
-              <p className="text-xs text-blue-200 max-w-xs">
-                {tierLockReason[activeTier]}
+          {/* Tab Blur Security Overlay */}
+          {isPausedDueToBlur && (
+            <div className="absolute inset-0 bg-black/85 backdrop-blur-xs flex flex-col items-center justify-center p-4 z-30">
+              <AlertTriangle className="w-10 h-10 text-amber-400 mb-2 animate-bounce" />
+              <h4 className="font-extrabold text-sm text-white">Stream Paused!</h4>
+              <p className="text-xs text-amber-200 mt-1 max-w-xs text-center">
+                To prevent fraud, video streaming pauses when you switch tabs. Please keep this tab active to finish earning your coins.
               </p>
-            </div>
-          ) : currentTierInfo.remaining === 0 ? (
-            <div className="flex flex-col items-center gap-2 text-center">
-              <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-              <span className="text-sm font-bold text-white">Daily Limit Reached!</span>
-              <p className="text-xs text-blue-200 max-w-xs">
-                You have watched all 10 {cfg.label} ads today. Your limit resets at midnight UTC.
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-[#1769D2] flex items-center justify-center shadow-lg hover:scale-105 transition-transform">
-                <Play className="w-6 h-6 text-white ml-0.5 fill-current" />
-              </div>
-              <div>
-                <span className="text-sm font-bold block">Ready to Play</span>
-                <span className="text-xs text-blue-200">
-                  Tap Watch Video to begin the {cfg.duration}-second clip.
-                </span>
-              </div>
             </div>
           )}
 
-          {/* Progress bar along bottom of player */}
+          {/* Playing HUD overlay */}
           {isPlaying && (
-            <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/20 z-20">
-              <div
-                className="h-full bg-emerald-400 transition-all duration-1000"
-                style={{ width: `${progress}%` }}
-              />
+            <div className="absolute inset-0 flex flex-col justify-between p-3.5 z-20 pointer-events-none">
+              {/* Top HUD */}
+              <div className="w-full flex items-center justify-between text-xs pointer-events-auto">
+                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/70 backdrop-blur-md text-amber-300 font-bold border border-amber-500/30 text-[10px] uppercase tracking-wider">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                  Live Sponsor Stream
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsMuted((prev) => !prev)}
+                    className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md text-white border border-white/20 transition cursor-pointer"
+                    title={isMuted ? "Unmute" : "Mute"}
+                  >
+                    {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                  </button>
+
+                  <span className="px-3 py-1 rounded-full bg-[#1769D2]/90 backdrop-blur-md text-white font-extrabold text-xs shadow-md border border-white/20">
+                    Reward in {secondsLeft}s
+                  </span>
+                </div>
+              </div>
+
+              {/* Bottom Video Information */}
+              <div className="w-full flex items-end justify-between text-left">
+                <div>
+                  <span className="text-xs font-bold text-white drop-shadow-md block">
+                    {cfg.title}
+                  </span>
+                  <span className="text-[10px] text-zinc-300 drop-shadow-md">
+                    {cfg.sponsor}
+                  </span>
+                </div>
+              </div>
             </div>
           )}
+
+          {/* Idle Start Overlay */}
+          {!isPlaying && !isRecording && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 bg-black/50 z-20">
+              <div className="w-14 h-14 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md flex items-center justify-center border border-white/30 shadow-lg mb-2 cursor-pointer transition active:scale-95">
+                <Play className="w-6 h-6 text-white ml-1 fill-white" />
+              </div>
+              <p className="font-bold text-sm text-white drop-shadow-md">
+                Ready to stream {cfg.label} ad ({cfg.duration}s)
+              </p>
+              <p className="text-[11px] text-zinc-300 mt-0.5">
+                Earn +{currentTierInfo.coinsPerAd} Coins upon stream completion
+              </p>
+            </div>
+          )}
+
+          {/* Processing / Crediting Overlay */}
+          {isRecording && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-xs z-30">
+              <Loader2 className="w-9 h-9 text-[#60A5FA] animate-spin mb-2" />
+              <p className="font-bold text-sm text-white">Validating Stream &amp; Crediting Wallet...</p>
+              <p className="text-[11px] text-zinc-400 mt-1">Applying double-entry ledger entry</p>
+            </div>
+          )}
+
+          {/* Progress Bar */}
+          <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/20 overflow-hidden z-20">
+            <div
+              className="h-full bg-linear-to-r from-blue-500 via-indigo-500 to-emerald-400 transition-all duration-300 ease-linear"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
 
-        {/* Action Button */}
-        <button
-          onClick={startAd}
-          disabled={isPlaying || isStarting || isRecording || isCurrentLocked || currentTierInfo.remaining === 0}
-          className={`w-full py-3.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer ${
-            isPlaying || isStarting || isRecording
-              ? "bg-gray-100 text-[#64748B] cursor-not-allowed border border-[#E2E8F0]"
-              : isCurrentLocked
-              ? "bg-gray-100 text-[#94A3B8] cursor-not-allowed border border-[#E2E8F0]"
-              : currentTierInfo.remaining === 0
-              ? "bg-gray-100 text-[#94A3B8] cursor-not-allowed border border-[#E2E8F0]"
-              : "bg-[#1769D2] hover:bg-[#1558b0] text-white active:scale-95"
-          }`}
-        >
-          {isStarting ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin text-[#1769D2]" />
-              <span>Connecting to Video Sponsor…</span>
-            </>
-          ) : isPlaying ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Playing {cfg.label} Video ({secondsLeft}s)…</span>
-            </>
-          ) : isRecording ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
-              <span>Processing Reward…</span>
-            </>
-          ) : currentTierInfo.remaining === 0 ? (
-            <span>All {cfg.label} Ads Completed</span>
-          ) : (
-            <>
-              <Play className="w-4 h-4 fill-current" />
-              <span>Watch Video (+{currentTierInfo.coinsPerAd} Coins)</span>
-            </>
-          )}
-        </button>
+        {/* Action Controls */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+          <div className="text-xs text-[#64748B] flex items-center gap-1.5 self-start sm:self-auto">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span>Anti-tab tampering active &bull; Unskippable playback</span>
+          </div>
+
+          <button
+            onClick={startAd}
+            disabled={isPlaying || isStarting || isRecording || isCurrentLocked || currentTierInfo.remaining === 0}
+            className={`w-full sm:w-auto px-6 h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition active:scale-95 shadow-sm ${
+              isCurrentLocked || currentTierInfo.remaining === 0
+                ? "bg-[#F1F5F9] text-[#94A3B8] border border-[#E2E8F0] cursor-not-allowed"
+                : "bg-[#1769D2] hover:bg-[#1557B0] text-white cursor-pointer"
+            }`}
+          >
+            {isStarting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Connecting Ad Server...</span>
+              </>
+            ) : isPlaying ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-white/80" />
+                <span>Playing ({secondsLeft}s)...</span>
+              </>
+            ) : isCurrentLocked ? (
+              <>
+                <Lock className="w-4 h-4" />
+                <span>Tier Locked</span>
+              </>
+            ) : currentTierInfo.remaining === 0 ? (
+              <span>Daily Limit Reached (10/10)</span>
+            ) : (
+              <>
+                <Play className="w-4 h-4 fill-white" />
+                <span>Watch Video &amp; Earn +{currentTierInfo.coinsPerAd} Coins</span>
+              </>
+            )}
+          </button>
+        </div>
       </section>
     </div>
   );

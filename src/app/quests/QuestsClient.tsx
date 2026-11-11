@@ -11,6 +11,7 @@ import {
   Gift
 } from "lucide-react";
 import CopyButton from "@/components/CopyButton";
+import { CommunityRaffle } from "@/components/gpt/CommunityRaffle";
 
 interface Quest {
   id: string;
@@ -272,6 +273,11 @@ export default function QuestsClient({
             );
           })}
         </div>
+      </section>
+
+      {/* ── Community Prize Raffle Section ── */}
+      <section>
+        <CommunityRaffle currentTickets={tickets} />
       </section>
 
       {/* ── Quests Category Filter Pills ── */}

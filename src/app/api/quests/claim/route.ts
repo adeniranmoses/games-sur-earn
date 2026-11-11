@@ -89,16 +89,33 @@ export async function POST(req: NextRequest) {
       // ── Handle Daily Streak (Recurring) ──
       if (quest.isRecurring) {
         if (user.lastStreakClaimedAt) {
-          const msSinceLast = now.getTime() - new Date(user.lastStreakClaimedAt).getTime();
-          const hoursSinceLast = msSinceLast / (1000 * 60 * 60);
+          const lastDate = new Date(user.lastStreakClaimedAt);
+          // Calendar days since Unix epoch (UTC) to avoid forward drift
+          const currentDayUtc = Math.floor(
+            Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 86400000
+          );
+          const lastClaimDayUtc = Math.floor(
+            Date.UTC(lastDate.getUTCFullYear(), lastDate.getUTCMonth(), lastDate.getUTCDate()) / 86400000
+          );
+          const daysDifference = currentDayUtc - lastClaimDayUtc;
 
-          if (hoursSinceLast < 24) {
-            const hoursLeft = Math.ceil(24 - hoursSinceLast);
-            throw new Error(`Daily streak already claimed today! Check back in ${hoursLeft}h.`);
+          if (daysDifference === 0) {
+            // Already claimed today (UTC)
+            const nextMidnightUtc = new Date(
+              Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0)
+            );
+            const hoursLeft = Math.max(
+              1,
+              Math.ceil((nextMidnightUtc.getTime() - now.getTime()) / (1000 * 60 * 60))
+            );
+            throw new Error(
+              `Daily streak already claimed today! Resets at midnight UTC (in ~${hoursLeft}h).`
+            );
           }
 
-          // If within 48h -> streak continues; if > 48h -> streak broke, restart at 1
-          const nextStreak = hoursSinceLast <= 48 ? user.currentStreak + 1 : 1;
+          // If claimed yesterday (daysDifference === 1), streak increments!
+          // If missed 1 or more calendar days, streak restarts at 1.
+          const nextStreak = daysDifference === 1 ? user.currentStreak + 1 : 1;
           const nextLongest = Math.max(user.longestStreak, nextStreak);
 
           // Credit coins to user's wallet

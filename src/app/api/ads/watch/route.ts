@@ -304,7 +304,7 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        // Write ledger row
+        // Write ledger row with unique nonce reference to prevent duplicate claims
         await tx.walletTransaction.create({
           data: {
             walletId: wallet.id,
@@ -312,7 +312,7 @@ export async function POST(req: NextRequest) {
             coins: coinsPerAd,
             status: "APPROVED",
             description: `Watched ${adTier} video ad (+${coinsPerAd} Coins)`,
-            referenceId: `AD-${adTier}-${userId}-${Date.now()}`,
+            referenceId: `AD-${adTier}-${userId}-${verification.nonce}`,
           },
         });
 

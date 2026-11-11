@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Coins, Loader2, ExternalLink, CheckCircle2 } from "lucide-react";
 import PartnerWalls from "@/components/gpt/PartnerWalls";
-import { LuckySpinWheel } from "@/components/games/LuckySpinWheel";
+import { ArcadeHub } from "@/components/games/ArcadeHub";
 
 interface Offer {
   id: string;
@@ -23,11 +23,11 @@ interface Offer {
 
 export default function EarnClient({
   offers,
-  _userId,
+  userId: _userId,
   isAdmin = false,
 }: {
   offers: Offer[];
-  _userId?: string;
+  userId?: string;
   isAdmin?: boolean;
 }) {
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
@@ -84,7 +84,7 @@ export default function EarnClient({
     <div className="flex flex-col gap-6">
       {/* ── ARCADE & MINI-GAMES SECTION ── */}
       <section>
-        <LuckySpinWheel />
+        <ArcadeHub />
       </section>
 
       {/* ── PARTNER OFFERWALL ROUTERS (BitLabs & CPX Research) ── */}
